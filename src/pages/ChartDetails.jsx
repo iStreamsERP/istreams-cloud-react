@@ -36,7 +36,7 @@ export default function ChartDetails() {
   const fetchDetailData = async () => {
     try {
       setLoading(true)
-      // You can modify this API call based on your backend requirements
+      // API call to get department and basic salary data
       const chartFilter = { 
         DashBoardID: dashboardId, 
         ChartNo: chartNo,
@@ -50,7 +50,17 @@ export default function ChartDetails() {
         chartFilter
       )
       
-      setDetailData(res || [])
+      // Transform data to ensure proper structure for department vs basic salary
+      const transformedData = (res || []).map(item => ({
+        // X-axis: Department name
+        department: item.department || item.Department || item.name || 'Unknown Department',
+        // Y-axis: Basic salary
+        basicSalary: item.basicSalary || item.basic_salary || item.BasicSalary || item.value || 0,
+        // Keep original data for reference
+        ...item
+      }))
+      
+      setDetailData(transformedData)
     } catch (error) {
       console.error("Failed to fetch detail data", error)
       setDetailData([])
@@ -59,18 +69,11 @@ export default function ChartDetails() {
     }
   }
 
-  const formatValue = (value, fieldName = '') => {
+  const formatSalary = (value) => {
     if (typeof value !== 'number') return value
     
-    const currencyKeywords = ['currency', 'curr', 'cost', 'value', 'amount', 'salary', 'salaries']
-    const fieldNameStr = String(fieldName || '')
-    const shouldShowCurrency = currencyKeywords.some(keyword => 
-      fieldNameStr.toLowerCase().includes(keyword.toLowerCase())
-    )
-    
     const isINR = userData?.companyCurrIsIndianStandard === true
-    const prefix = shouldShowCurrency ? currencySymbol : ''
-
+    
     const formatIndianNumber = (num) => {
       const isNegative = num < 0
       const absNum = Math.abs(num)
@@ -101,17 +104,10 @@ export default function ChartDetails() {
     }
 
     if (isINR) {
-      return `${prefix}${formatIndianNumber(Math.round(value))}`
+      return `${currencySymbol}${formatIndianNumber(Math.round(value))}`
     } else {
-      return `${prefix}${value.toLocaleString()}`
+      return `${currencySymbol}${value.toLocaleString()}`
     }
-  }
-
-  const formatFieldName = (fieldName) => {
-    return fieldName
-      .replace(/[_-]/g, " ")
-      .toLowerCase()
-      .replace(/^\w/, (c) => c.toUpperCase())
   }
 
   const CustomTooltip = ({ active, payload, label }) => {
@@ -119,11 +115,11 @@ export default function ChartDetails() {
     
     return (
       <div className="bg-white dark:bg-slate-800 p-3 border rounded-lg shadow-lg">
-        <p className="font-medium mb-2">{label}</p>
+        <p className="font-medium mb-2">Department: {label}</p>
         {payload.map((entry, index) => (
           <p key={index} className="text-sm">
             <span style={{ color: entry.color }}>●</span>
-            {` ${formatFieldName(entry.dataKey)}: ${formatValue(entry.value, entry.dataKey)}`}
+            {` Basic Salary: ${formatSalary(entry.value)}`}
           </p>
         ))}
       </div>
@@ -136,7 +132,7 @@ export default function ChartDetails() {
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <BarChart3 className="h-12 w-12 mb-4 mx-auto animate-pulse" />
-            <p>Loading detail data...</p>
+            <p>Loading department salary data...</p>
           </div>
         </div>
       </div>
@@ -173,13 +169,13 @@ export default function ChartDetails() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-xl font-bold">
-                Chart Details: {chartTitle || 'Chart Data'}
+                Department Basic Salaries: {chartTitle || 'Salary Analysis'}
               </CardTitle>
               <p className="text-muted-foreground mt-1">
-                Showing details for <strong>{selectedCategory}</strong> in <strong>{formatFieldName(fieldName)}</strong>
+                Showing basic salaries by department for <strong>{selectedCategory}</strong>
               </p>
               <p className="text-sm text-muted-foreground mt-1">
-                Value: {formatValue(fieldValue, fieldName)}
+                Value: {formatSalary(fieldValue)}
               </p>
             </div>
             <Button onClick={() => navigate(-1)} variant="outline">
@@ -190,94 +186,8 @@ export default function ChartDetails() {
         </CardHeader>
       </Card>
 
-      {/* Detail Chart */}
-      {detailData.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Detail Breakdown</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div style={{ width: "100%", height: 400 }}>
-              <ResponsiveContainer>
-                <BarChart
-                  data={detailData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
-                >
-                  <XAxis 
-                    dataKey="name" 
-                    angle={-45}
-                    textAnchor="end"
-                    height={100}
-                    fontSize={12}
-                  />
-                  <YAxis 
-                    tickFormatter={formatValue}
-                    fontSize={12}
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar 
-                    dataKey="value" 
-                    fill="#3b82f6"
-                    radius={[4, 4, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-center">
-              <BarChart3 className="h-12 w-12 mb-4 mx-auto text-muted-foreground" />
-              <h3 className="text-lg font-semibold mb-2">No Detail Data Available</h3>
-              <p className="text-muted-foreground">
-                No detailed breakdown is available for the selected category.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Summary Table */}
-      {detailData.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Data Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-2 font-medium">Category</th>
-                    <th className="text-right p-2 font-medium">Value</th>
-                    <th className="text-right p-2 font-medium">Percentage</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {detailData.map((item, index) => {
-                    const total = detailData.reduce((sum, d) => sum + (d.value || 0), 0)
-                    const percentage = total > 0 ? ((item.value || 0) / total * 100).toFixed(1) : '0.0'
-                    
-                    return (
-                      <tr key={index} className="border-b last:border-b-0 hover:bg-muted/50">
-                        <td className="p-2">{item.name || 'Unknown'}</td>
-                        <td className="p-2 text-right font-mono">
-                          {formatValue(item.value, fieldName)}
-                        </td>
-                        <td className="p-2 text-right text-muted-foreground">
-                          {percentage}%
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+  
+ 
     </div>
   )
 }

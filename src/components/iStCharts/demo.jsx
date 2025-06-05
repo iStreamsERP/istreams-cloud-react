@@ -1,11 +1,6 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState , useRef, useCallback} from "react"
 import { Bar, BarChart, Cell, LabelList, XAxis, YAxis, ResponsiveContainer, Legend, Tooltip, LineChart, Line, AreaChart, Area, PieChart, Pie } from "recharts"
-import {
-  Tooltip as FormateTooltip,
-  TooltipProvider,
-  TooltipContent ,
-  TooltipTrigger ,
-} from "@/components/ui/tooltip"
+import {Tooltip as FormateTooltip,TooltipProvider, TooltipContent , TooltipTrigger} from "@/components/ui/tooltip"
 import { useAuth } from "@/contexts/AuthContext"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -23,6 +18,7 @@ import { toPng } from 'html-to-image';
 import jsPDF from 'jspdf';
 import html2canvas from "html2canvas"
 import { callSoapService } from "@/services/callSoapService"
+import { useNavigate } from "react-router-dom"
 export function GrossSalaryChart({ DashBoardID, ChartNo, chartTitle ,chartType: initialChartType = "bar"}) {
   const { userData } = useAuth()
   const [tasks, setTasks] = useState([])
@@ -73,6 +69,7 @@ export function GrossSalaryChart({ DashBoardID, ChartNo, chartTitle ,chartType: 
   const [availableCategories, setAvailableCategories] = useState({}) // Object to store unique values per field
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
+  const navigate = useNavigate()
   const currencySymbol = userData?.companyCurrSymbol || "$"
 
   const formatFieldName = (fieldName) => {
@@ -143,6 +140,64 @@ useEffect(() => {
     setDataLabelPosition("top") // or whatever your default should be
   }
 }, [chartType])
+const [isDragging, setIsDragging] = useState({ min: false, max: false });
+const sliderRef = useRef(null);
+
+// Add these helper functions
+const dataMin = Math.min(...tasks.map(t => parseFloat(t[selectedRangeField]) || 0));
+const dataMax = Math.max(...tasks.map(t => parseFloat(t[selectedRangeField]) || 0));
+
+const valueToPercent = (value) => {
+  return ((value - dataMin) / (dataMax - dataMin)) * 100;
+};
+
+const getValueFromPosition = useCallback((clientX) => {
+  if (!sliderRef.current) return dataMin;
+  
+  const rect = sliderRef.current.getBoundingClientRect();
+  const percent = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+  return dataMin + (percent / 100) * (dataMax - dataMin);
+}, [dataMin, dataMax]);
+
+const handleMouseDown = (type) => (e) => {
+  e.preventDefault();
+  setIsDragging({ ...isDragging, [type]: true });
+};
+
+const handleMouseMove = useCallback((e) => {
+  if (!isDragging.min && !isDragging.max) return;
+  
+  const newValue = getValueFromPosition(e.clientX);
+  
+  if (isDragging.min) {
+    const maxAllowed = rangeMax - (dataMax - dataMin) * 0.01;
+    const adjustedValue = Math.max(dataMin, Math.min(newValue, maxAllowed));
+    setRangeMin(adjustedValue);
+  }
+  
+  if (isDragging.max) {
+    const minAllowed = rangeMin + (dataMax - dataMin) * 0.01;
+    const adjustedValue = Math.min(dataMax, Math.max(newValue, minAllowed));
+    setRangeMax(adjustedValue);
+  }
+}, [isDragging, rangeMin, rangeMax, dataMin, dataMax, getValueFromPosition]);
+
+const handleMouseUp = useCallback(() => {
+  setIsDragging({ min: false, max: false });
+}, []);
+
+// Add this useEffect for global event listeners
+useEffect(() => {
+  if (isDragging.min || isDragging.max) {
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }
+}, [isDragging, handleMouseMove, handleMouseUp]);
 
 const getFieldMaxValue = (fieldName) => {
   if (!fieldName || tasks.length === 0) return 100000; // default fallback
@@ -424,9 +479,8 @@ const formatValue = (value, fieldName = '') => {
   }
   
   // Check if currency is INR (Indian Rupee)
-  const isINR = userData?.companyCurrIsIndianStandard === true;
-  const prefix = shouldShowCurrency ? currencySymbol : '';
-
+  const isINR = userData.companyCurrIsIndianStandard === false;
+  const prefix = shouldShowCurrency ? `${currencySymbol} ` : '';
   switch (displayFormat) {
     case "K":
       if (isINR) {
@@ -449,6 +503,68 @@ const formatValue = (value, fieldName = '') => {
   }
 }
 
+const [customColors, setCustomColors] = useState([
+  "#3b82f6", "#10b981", "#f59e0b", "#ef4444", 
+  "#8b5cf6", "#ec4899", "#14b8a6", "#f97316"
+])
+const [showCustomColorPicker, setShowCustomColorPicker] = useState(false)
+  const getColorSchemes = () => {
+    const schemes = {
+      default: [
+        "#3b82f6", "#10b981", "#f59e0b", "#ef4444", 
+        "#8b5cf6", "#ec4899", "#14b8a6", "#f97316",
+        "#6366f1", "#06b6d4", "#84cc16", "#f43f5e"
+      ],
+      ocean: [
+        "#0ea5e9", "#06b6d4", "#0891b2", "#0e7490",
+        "#155e75", "#164e63", "#1e40af", "#1d4ed8"
+      ],
+      forest: [
+        "#16a34a", "#15803d", "#166534", "#14532d",
+        "#65a30d", "#84cc16", "#a3e635", "#bef264"
+      ],
+      sunset: [
+        "#f97316", "#ea580c", "#dc2626", "#b91c1c",
+        "#991b1b", "#7c2d12", "#f59e0b", "#d97706"
+      ],
+      purple: [
+        "#8b5cf6", "#7c3aed", "#6d28d9", "#5b21b6",
+        "#4c1d95", "#a855f7", "#c084fc", "#ddd6fe"
+      ],
+      monochrome: [
+        "#374151", "#4b5563", "#6b7280", "#9ca3af",
+        "#d1d5db", "#e5e7eb", "#1f2937", "#111827"
+      ],
+    custom: customColors
+    }
+    return schemes[colorScheme] || schemes.default
+  }
+// Function to update a specific custom color
+const updateCustomColor = (index, color) => {
+  const newColors = [...customColors]
+  newColors[index] = color
+  setCustomColors(newColors)
+}
+
+// Function to add a new custom color
+const addCustomColor = () => {
+  if (customColors.length < 12) {
+    setCustomColors([...customColors, "#000000"])
+  }
+}
+
+// Function to remove a custom color
+const removeCustomColor = (index) => {
+  if (customColors.length > 1) {
+    const newColors = customColors.filter((_, i) => i !== index)
+    setCustomColors(newColors)
+  }
+}
+  const getFieldColor = (fieldIndex) => {
+    const colors = getColorSchemes()
+    return colors[fieldIndex % colors.length]
+  }
+
   const getDataLabelPosition = () => {
     const positions = {
       top: "top",
@@ -459,6 +575,31 @@ const formatValue = (value, fieldName = '') => {
     }
     return positions[dataLabelPosition] || "top"
   }
+
+  const handleBarClick = (data, index, event) => {
+  if (!data || !data.payload) return
+  
+  const clickedData = data.payload
+  const selectedCategory = clickedData.combinedKey || clickedData.name
+  
+  // Get the primary Y-axis field (first selected field)
+  const primaryField = selectedYAxes[0]
+  if (!primaryField) return
+  
+  const fieldValue = clickedData[primaryField]
+  
+  // Navigate to chart details page with drill-down data
+  navigate('/Chartdetails', {
+    state: {
+      selectedCategory,
+      fieldName: primaryField,
+      fieldValue,
+      dashboardId: DashBoardID,
+      chartNo: ChartNo,
+      chartTitle: customTitle
+    }
+  })
+}
 
   const getChartTypeIcon = (type) => {
     switch (type) {
@@ -621,6 +762,8 @@ const formatValue = (value, fieldName = '') => {
                 fill={getFieldColor(index)}
                 radius={barRadius}
                 name={formatFieldName(field)}
+                onClick={handleBarClick}
+                style={{ cursor: 'pointer' }}
               >
                 {showDataLabels && (
                   <LabelList
@@ -635,472 +778,326 @@ const formatValue = (value, fieldName = '') => {
             ))}
           </BarChart>
         )
-       // Replace the horizontalBar case in your renderChart() function with this fixed version:
 
-case "horizontalBar":
-  return (
-    <BarChart 
-      {...commonProps} 
-      layout="vertical"  // Changed from "horizontal" to "vertical"
-      barGap={barGap}
-      margin={{ top: 20, right: 50, left: 150, bottom: 20 }} // Increased right margin for labels
-    >
-      <XAxis 
-        type="number"
-        tickLine={false}
-        axisLine={false}
-        fontSize={fontSize}
-        tickFormatter={formatValue}
-        grid={showGrid}
-      />
-      <YAxis 
-        type="category"
-        dataKey="combinedKey"
-        tickLine={false}
-        axisLine={false}
-        fontSize={fontSize}
-        width={140}
-        tickFormatter={(value) => {
-          return String(value).length > 20 
-            ? String(value).substring(0, 20) + "..." 
-            : String(value)
-        }}
-      />
-      {showTooltip && <Tooltip content={<CustomTooltip />} />}
-      
-      {selectedYAxes.length > 1 && showLegend && (
-        <Legend 
-          formatter={(value) => formatFieldName(value)}
-          wrapperStyle={{ paddingTop: "20px", fontSize: `${legendFontSize}px` }}
-          layout={legendPosition === "left" || legendPosition === "right" ? "vertical" : "horizontal"}
-          align={legendPosition === "left" ? "left" : legendPosition === "right" ? "right" : "center"}
-          verticalAlign={legendPosition === "top" ? "top" : "bottom"}
-        />
-      )}
 
-      {selectedYAxes.map((field, index) => (
-        <Bar 
-          key={field}
-          dataKey={field} 
-          fill={getFieldColor(index)}
-          radius={[0, barRadius, barRadius, 0]} // Horizontal bar radius
-          name={formatFieldName(field)}
-        >
-          {showDataLabels && (
-            <LabelList
-              dataKey={field}
-              position="right"
-              formatter={(value) => formatValue(value, field)}
-              className="fill-foreground"
-              fontSize={fontSize - 2}
-            />
-          )}
-        </Bar>
-      ))}
-    </BarChart>
-  )
 
-// Also replace the horizontalStackedBar case with this fixed version:
-
-case "horizontalStackedBar":
-  return (
-    <BarChart 
-      {...commonProps} 
-      layout="vertical"  // Changed from "horizontal" to "vertical"
-      barGap={barGap}
-      margin={{ top: 20, right: 50, left: 150, bottom: 20 }}
-    >
-      <XAxis 
-        type="number"
-        tickLine={false}
-        axisLine={false}
-        fontSize={fontSize}
-        tickFormatter={formatValue}
-        grid={showGrid}
-      />
-      <YAxis 
-        type="category"
-        dataKey="combinedKey"
-        tickLine={false}
-        axisLine={false}
-        fontSize={fontSize}
-        width={140}
-        tickFormatter={(value) => {
-          return String(value).length > 20 
-            ? String(value).substring(0, 20) + "..." 
-            : String(value)
-        }}
-      />
-      {showTooltip && <Tooltip content={<CustomTooltip />} />}
-      
-      {/* Always show legend for stacked charts */}
-      <Legend 
-        formatter={(value) => formatFieldName(value)}
-        wrapperStyle={{ paddingTop: "20px" , fontSize: `${legendFontSize}px`}}
-        layout={legendPosition === "left" || legendPosition === "right" ? "vertical" : "horizontal"}
-        align={legendPosition === "left" ? "left" : legendPosition === "right" ? "right" : "center"}
-        verticalAlign={legendPosition === "top" ? "top" : "bottom"}
-      />
-
-      {selectedYAxes.map((field, index) => (
-        <Bar 
-          key={field}
-          dataKey={field} 
-          stackId="horizontalStack"
-          fill={getFieldColor(index)}
-          radius={index === selectedYAxes.length - 1 ? [0, barRadius, barRadius, 0] : [0, 0, 0, 0]}
-          name={formatFieldName(field)}
-        >
-          {showDataLabels && (
-            <LabelList
-              dataKey={field}
-                           position={dataLabelPosition === "center" ? "inside" : getDataLabelPosition()}
-              formatter={(value) => formatValue(value, field)}
-              className="fill-foreground"
-              fontSize={fontSize - 2}
-            />
-          )}
-        </Bar>
-      ))}
-    </BarChart>
-  )
-      case "line":
-        return (
-          <LineChart {...commonProps}>
-            <XAxis {...xAxisProps} />
-            <YAxis {...yAxisProps} />
-            {showTooltip && <Tooltip content={<CustomTooltip />} />}
-            
-            {selectedYAxes.length > 1 && showLegend && (
-              <Legend 
-                formatter={(value) => formatFieldName(value)}
-                wrapperStyle={{ paddingTop: "20px", fontSize: `${legendFontSize}px` }}
-              />
-            )}
-
-            {selectedYAxes.map((field, index) => (
-              <Line
-                key={field}
-                type={curveType}
-                dataKey={field}
-                stroke={getFieldColor(index)}
-                strokeWidth={strokeWidth}
-                dot={showDots ? { r: 4 } : false}
-                name={formatFieldName(field)}
-              />
-            ))}
-          </LineChart>
-        )
-
-      case "area":
-        return (
-          <AreaChart {...commonProps}>
-            <XAxis {...xAxisProps} />
-            <YAxis {...yAxisProps} />
-            {showTooltip && <Tooltip content={<CustomTooltip />} />}
-            
-            {selectedYAxes.length > 1 && showLegend && (
-              <Legend 
-                formatter={(value) => formatFieldName(value)}
-                wrapperStyle={{ paddingTop: "20px", fontSize: `${legendFontSize}px` }}
-              />
-            )}
-
-            {selectedYAxes.map((field, index) => (
-              <Area
-                key={field}
-                type={curveType}
-                dataKey={field}
-                stroke={getFieldColor(index)}
-                fill={getFieldColor(index)}
-                fillOpacity={fillOpacity}
-                strokeWidth={strokeWidth}
-                name={formatFieldName(field)}
-              />
-            ))}
-          </AreaChart>
-        )
-
-case "stackedBar":
-   return (
-    <BarChart {...commonProps} barGap={barGap}>
-      <XAxis {...xAxisProps} />
-      <YAxis {...yAxisProps} />
-      {showTooltip && <Tooltip content={<CustomTooltip />} />}
-      
-      {/* Always show legend for stacked charts */}
-      <Legend 
-        formatter={(value) => formatFieldName(value)}
-        wrapperStyle={{ paddingTop: "20px", fontSize: `${legendFontSize}px` }}
-        layout={legendPosition === "left" || legendPosition === "right" ? "vertical" : "horizontal"}
-        align={legendPosition === "left" ? "left" : legendPosition === "right" ? "right" : "center"}
-        verticalAlign={legendPosition === "top" ? "top" : "bottom"}
-      />
-
-      {selectedYAxes.map((field, index) => (
-        <Bar 
-          key={field}
-          dataKey={field} 
-          stackId="stack1" // This creates the stacking effect
-          fill={getFieldColor(index)}
-          radius={index === selectedYAxes.length - 1 ? [barRadius, barRadius, 0, 0] : [0, 0, 0, 0]} // Only round top bar
-          name={formatFieldName(field)}
-        >
-          {showDataLabels && (
-            <LabelList
-              dataKey={field}
-              position={dataLabelPosition === "center" ? "inside" : getDataLabelPosition()}
-              formatter={(value) => formatValue(value, field)}
-              className="fill-foreground"
-              fontSize={fontSize - 2}
-            />
-          )}
-        </Bar>
-      ))}
-    </BarChart>
-  )
-
-case "pie":
-case "donut":
-case "stackedPie":
-case "stackedDonut":
-  const effectiveType = getEffectiveChartType()
-  const isStacked = effectiveType === "stackedPie" || effectiveType === "stackedDonut"
-  const isDonut = effectiveType === "donut" || effectiveType === "stackedDonut"
-  
-  // For regular pie/donut with single Y-axis
-  if (!isStacked) {
-    return (
-      <PieChart {...commonProps}>
-        {showTooltip && <Tooltip content={<CustomTooltip />} />}
-        
-        {showLegend && chartData.length > 1 && (
-          <Legend
-            formatter={(value) => value}
-            layout={legendPosition === "left" || legendPosition === "right" ? "vertical" : "horizontal"}
-            align={legendPosition === "left" ? "left" : legendPosition === "right" ? "right" : "center"}
-             verticalAlign={legendPosition === "top" ? "top" : "bottom"}
-            wrapperStyle={{ paddingTop: "20px", fontSize: `${legendFontSize}px` }}
-
-          />
-        )}
-        
-        <Pie
-          data={chartData}
-          dataKey={selectedYAxes[0]}
-          nameKey="name"
-          cx="50%"
-          cy="50%"
-          outerRadius={pieOuterRadius}
-          innerRadius={isDonut ? pieInnerRadius : 0}
-          fill="#8884d8"
-          label={renderCustomLabel}
-          labelLine={false}
-          startAngle={pieStartAngle}
-          endAngle={pieEndAngle}
-        >
-          {chartData.map((entry, index) => (
-            <Cell key={`cell-${index}`} fill={getFieldColor(index)} />
-          ))}
-        </Pie>
-      </PieChart>
-    )
-  }
-  
-  // For stacked pie/donut with multiple Y-axis fields
-  if (selectedYAxes.length < 2) {
-    return (
-      <div className="flex items-center justify-center h-full text-muted-foreground">
-        <div className="text-center">
-          <PieChartIcon className="h-12 w-12 mb-4 mx-auto" />
-          <p className="text-lg mb-2">Stacked {isDonut ? 'Donut' : 'Pie'} Chart</p>
-          <p className="text-sm">Multiple Y-axis fields detected. Showing stacked view.</p>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <PieChart {...commonProps}>
-      {showTooltip && <Tooltip content={<CustomTooltip />} />}
-      {showLegend && (
-        <Legend
-          formatter={(value) => formatFieldName(value)}
-          layout={legendPosition === "left" || legendPosition === "right" ? "vertical" : "horizontal"}
-          align={legendPosition === "left" ? "left" : legendPosition === "right" ? "right" : "center"}
-          verticalAlign={legendPosition === "top" ? "top" : "bottom"}
-        />
-      )}
-      
-      {/* Outer ring (first Y-axis field) */}
-      <Pie
-        data={chartData}
-        dataKey={selectedYAxes[0]}
-        nameKey="name"
-        cx="50%"
-        cy="50%"
-        outerRadius={pieOuterRadius}
-        innerRadius={isDonut ? pieInnerRadius : pieInnerRadius}
-        fill="#8884d8"
-        label={showPieLabels ? renderCustomLabel : false}
-        labelLine={false}
-        startAngle={pieStartAngle}
-        endAngle={pieEndAngle}
-      >
-        {chartData.map((entry, index) => (
-          <Cell key={`outer-cell-${index}`} fill={getFieldColor(index)} />
-        ))}
-      </Pie>
-
-      {/* Inner rings for additional Y-axis fields */}
-      {selectedYAxes.slice(1).map((field, fieldIndex) => {
-        const ringIndex = fieldIndex + 1
-        const currentOuterRadius = Math.max(30, pieOuterRadius - (ringIndex * 25))
-        const currentInnerRadius = Math.max(10, currentOuterRadius - 20)
-        
-        return (
-          <Pie
-            key={`ring-${fieldIndex}`}
-            data={chartData}
-            dataKey={field}
-            nameKey="name"
-            cx="50%"
-            cy="50%"
-            outerRadius={currentOuterRadius}
-            innerRadius={currentInnerRadius}
-            fill="#82ca9d"
-            startAngle={pieStartAngle}
-            endAngle={pieEndAngle}
-          >
-            {chartData.map((entry, index) => (
-              <Cell 
-                key={`ring-${fieldIndex}-cell-${index}`} 
-                fill={getFieldColor(index + (ringIndex * selectedYAxes.length))} 
-              />
-            ))}
-          </Pie>
-        )
-      })}
-    </PieChart>
-  )
-
-// Also add this notification in the chart configuration area, replace the existing pie chart notice with:
-
-{(chartType === "pie" || chartType === "donut") && selectedYAxes.length > 1 && (
-  <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-    <div className="flex items-start gap-2">
-      <div className="p-1 bg-blue-100 dark:bg-blue-800 rounded">
-        <PieChartIcon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-      </div>
-      <div>
-        <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-1">
-          Auto-Stacked {chartType === "donut" ? "Donut" : "Pie"} Chart
-        </p>
-        <p className="text-xs text-blue-700 dark:text-blue-300">
-          Multiple Y-axis fields detected ({selectedYAxes.length} fields). 
-          Automatically switched to stacked {chartType} chart to display all data series.
-        </p>
-      </div>
-    </div>
-  </div>
-)}
-
-// Update the Advanced Options section for pie/donut charts:
-
-{(chartType === "pie" || chartType === "donut" || getEffectiveChartType().includes("stacked")) && (
-  <div className="space-y-4">
-    <h5 className="font-medium text-sm">
-      {getEffectiveChartType().includes("stacked") ? 
-        `Stacked ${chartType === "donut" ? "Donut" : "Pie"} Options` : 
-        "Pie/Donut Options"
-      }
-    </h5>
-    
-    {getEffectiveChartType().includes("stacked") && (
-      <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg mb-4">
-        <p className="text-sm text-blue-700 dark:text-blue-300">
-          <strong>Auto-Stacked {chartType === "donut" ? "Donut" : "Pie"} Chart:</strong> Creates nested rings with multiple data series. 
-          Each Y-axis field creates a new ring automatically when multiple fields are selected.
-        </p>
-      </div>
-    )}
-    
-    {/* Rest of the pie/donut options remain the same */}
-    <div className="grid grid-cols-2 gap-4">
-      <div className="space-y-2">
-        <Label className="text-sm">Outer Radius:</Label>
-        <Input
-          type="number"
-          value={pieOuterRadius}
-          onChange={(e) => setPieOuterRadius(Number(e.target.value))}
-          min="50"
-          max="150"
-        />
-      </div>
-      
-      {(chartType === "donut" || getEffectiveChartType().includes("stacked")) && (
-        <div className="space-y-2">
-          <Label className="text-sm">Inner Radius:</Label>
-          <Input
-            type="number"
-            value={pieInnerRadius}
-            onChange={(e) => setPieInnerRadius(Number(e.target.value))}
-            min="0"
-            max="100"
-          />
-        </div>
-      )}
-    </div>
-
-    <div className="grid grid-cols-2 gap-4">
-      <div className="space-y-2">
-        <Label className="text-sm">Start Angle:</Label>
-        <Input
-          type="number"
-          value={pieStartAngle}
-          onChange={(e) => setPieStartAngle(Number(e.target.value))}
-          min="0"
-          max="360"
-        />
-      </div>
-      
-      <div className="space-y-2">
-        <Label className="text-sm">End Angle:</Label>
-        <Input
-          type="number"
-          value={pieEndAngle}
-          onChange={(e) => setPieEndAngle(Number(e.target.value))}
-          min="0"
-          max="360"
-        />
-      </div>
-    </div>
-
-    <div className="flex items-center space-x-2">
-      <Checkbox
-        id="showPieLabels"
-        checked={showPieLabels}
-        onCheckedChange={setShowPieLabels}
-      />
-      <Label htmlFor="showPieLabels" className="text-sm">
-        {getEffectiveChartType().includes("stacked") ? "Show Labels (Outer Ring Only)" : "Show Pie Labels"}
-      </Label>
-    </div>
-  </div>
-)}
       default:
         return null
     }
   }
 
-
 return (
 <Card className="w-full bg-white dark:bg-slate-950 border shadow-sm">
   <CardHeader className="p-2 sm:p-4">
     {/* Top row: Title and Controls */}
-  
+  <div className="flex flex-wrap gap-4 items-center justify-between">
       {/* Title and Display Format */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center min-w-0 flex-shrink">
+        <h3 className="text-lg sm:text-xl font-bold truncate flex flex-col gap-1 ">     
+          {chartTitle}
+          <span className="text-sm">CurrencyType:{userData.companyCurrName}</span>
+        </h3>
+       
+      </div>
+      
+      {/* Chart Type and Action Buttons */}
+    
+    </div>
+
+
+    <div className="space-y-4 mb-4 sm:mb-6 flex flex-row gap-2 items-center justify-between flex-wrap">
+       
+      {/* Single line: X-Axis, Y-Axis, and Range */}
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+        
+       
+      {/* X-Axis Selection */}
+        <div className="flex-1 space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="p-1 bg-blue-100 dark:bg-blue-900 rounded flex-shrink-0">
+              <BarChart3 className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+            </div>
+            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+              X-Axis
+            </label>
+          </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button 
+                variant="outline" 
+                className="w-full justify-between bg-white dark:bg-slate-950 shadow-sm hover:shadow-md transition-shadow text-xs h-9"
+              >
+                <span className="truncate">
+                  {selectedXAxes.length > 0 ? selectedXAxes.map(field => formatFieldName(field)).join(', ') : 'Select'}
+                </span>
+                <ChevronDown className="h-3 w-3 flex-shrink-0" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[320px] sm:w-96" align="start">
+              <div className="space-y-4">
+                {/* Field Selection Section */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium text-xs">Select Text/String Fields</h4>
+                    <Badge variant="secondary" className="text-xs">
+                      {textFields.length}
+                    </Badge>
+                  </div>
+                  <ScrollArea className="h-32">
+                    <div className="space-y-2">
+                      {textFields.length > 0 ? (
+                        textFields.map(field => (
+                          <div key={`x-${field}`} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`x-${field}`}
+                              checked={selectedXAxes.includes(field)}
+                              onCheckedChange={(checked) => handleXAxisChange(field, checked)}
+                            />
+                            <label
+                              htmlFor={`x-${field}`}
+                              className="text-xs cursor-pointer flex-1 truncate"
+                            >
+                              {formatFieldName(field)}
+                            </label>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-xs text-muted-foreground text-center py-4">
+                          No text fields found
+                        </p>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
+
+                {/* Category Filters Section - Only show if fields are selected */}
+                {selectedXAxes.length > 0 && Object.keys(availableCategories).length > 0 && (
+                  <>
+                    <Separator />
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1 bg-orange-100 dark:bg-orange-900 rounded flex-shrink-0">
+                          <Eye className="h-3 w-3 text-orange-600 dark:text-orange-400" />
+                        </div>
+                        <h4 className="font-medium text-xs">Category Filters</h4>
+                      </div>
+                      
+                      <ScrollArea className="h-48">
+                        <div className="space-y-3">
+                          {selectedXAxes.map(field => (
+                            <div key={`category-filter-${field}`} className="space-y-2 p-2 border rounded-md bg-gray-50 dark:bg-slate-900">
+                              <div className="flex items-center justify-between">
+                                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
+                                  {formatFieldName(field)}
+                                </label>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="secondary" className="text-xs">
+                                    {(selectedCategories[field] || []).length}/{(availableCategories[field] || []).length}
+                                  </Badge>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => selectAllCategories(field)}
+                                      className="text-xs h-5 px-1"
+                                    >
+                                      All
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => deselectAllCategories(field)}
+                                      className="text-xs h-5 px-1"
+                                    >
+                                      None
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <div className="max-h-24 overflow-y-auto">
+                                <div className="space-y-1">
+                                  {(availableCategories[field] || []).map(value => (
+                                    <div key={`${field}-${value}`} className="flex items-center space-x-2">
+                                      <Checkbox
+                                        id={`${field}-${value}`}
+                                        checked={(selectedCategories[field] || []).includes(value)}
+                                        onCheckedChange={(checked) => handleCategoryChange(field, value, checked)}
+                                      />
+                                      <label
+                                        htmlFor={`${field}-${value}`}
+                                        className="text-xs cursor-pointer flex-1 break-words"
+                                        title={value}
+                                      >
+                                        {String(value).length > 20 ? `${String(value).substring(0, 20)}...` : String(value)}
+                                      </label>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="text-xs text-muted-foreground text-center border-t pt-1">
+                                {(selectedCategories[field] || []).length} of {(availableCategories[field] || []).length} selected
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  </>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        {/* Y-Axis Selection */}
+        <div className="flex-1 space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="p-1 bg-green-100 dark:bg-green-900 rounded flex-shrink-0">
+              <TrendingUp className="h-3 w-3 text-green-600 dark:text-green-400" />
+            </div>
+            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+              Y-Axis
+            </label>
+          </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button 
+                variant="outline" 
+                className="w-full justify-between bg-white dark:bg-slate-950 shadow-sm hover:shadow-md transition-shadow text-xs h-9"
+              >
+                <span className="truncate">
+                  {selectedYAxes.length > 0 ? selectedYAxes.map(field => formatFieldName(field)).join(', ') : 'Select'}
+                </span>
+                <ChevronDown className="h-3 w-3 flex-shrink-0" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[280px] sm:w-80" align="start">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-xs">Select Numeric Fields</h4>
+                  <Badge variant="secondary" className="text-xs">
+                    {numericFields.length}
+                  </Badge>
+                </div>
+                <ScrollArea className="h-32">
+                  <div className="space-y-2">
+                    {numericFields.length > 0 ? (
+                      numericFields.map(field => (
+                        <div key={`y-${field}`} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`y-${field}`}
+                            checked={selectedYAxes.includes(field)}
+                            onCheckedChange={(checked) => handleYAxisChange(field, checked)}
+                          />
+                          <label
+                            htmlFor={`y-${field}`}
+                            className="text-xs cursor-pointer flex-1 truncate"
+                          >
+                            {formatFieldName(field)}
+                          </label>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-muted-foreground text-center py-4">
+                        No numeric fields found
+                      </p>
+                    )}
+                  </div>
+                </ScrollArea>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+    
+      </div>
+       {/* Range Slider - Inline */}
+      <div className="w-[200px]">
+            {selectedYAxes.length > 0 && selectedRangeField && (
+          <div className="flex-1 space-y-2">
+           
+            <div className="p-2 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-blue-700 dark:text-blue-300 truncate">
+                    {formatFieldName(selectedRangeField)}
+                  </span>
+                  <div className="flex items-center space-x-1 font-mono bg-white dark:bg-slate-800 px-2 py-1 rounded border text-xs">
+                    <span className="text-blue-600 dark:text-blue-400">{formatValue(rangeMin)}</span>
+                    <span className="text-gray-400">-</span>
+                    <span className="text-blue-600 dark:text-blue-400">{formatValue(rangeMax)}</span>
+                  </div>
+                </div>
+                
+                {/* Compact Range Slider */}
+                <div className="relative w-full h-6 flex items-center" ref={sliderRef}>
+  {/* Background track */}
+  <div className="absolute w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg shadow-inner"></div>
   
+  {/* Active range */}
+  <div
+    className="absolute h-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg shadow-md"
+    style={{
+      left: `${valueToPercent(rangeMin)}%`,
+      width: `${valueToPercent(rangeMax) - valueToPercent(rangeMin)}%`
+    }}
+  ></div>
+  
+  {/* Min thumb */}
+  <div
+    className={`absolute w-6 h-6 bg-blue-500 border-2 border-white rounded-full shadow-lg cursor-pointer transform -translate-x-1/2 z-20 transition-transform hover:scale-110 ${
+      isDragging.min ? 'scale-110' : ''
+    }`}
+    style={{ left: `${valueToPercent(rangeMin)}%` }}
+    onMouseDown={handleMouseDown('min')}
+  />
+  
+  {/* Max thumb */}
+  <div
+    className={`absolute w-6 h-6 bg-indigo-500 border-2 border-white rounded-full shadow-lg cursor-pointer transform -translate-x-1/2 z-20 transition-transform hover:scale-110 ${
+      isDragging.max ? 'scale-110' : ''
+    }`}
+    style={{ left: `${valueToPercent(rangeMax)}%` }}
+    onMouseDown={handleMouseDown('max')}
+  />
+  
+  {/* Hidden range inputs for accessibility and keyboard support */}
+  <input
+    type="range"
+    min={dataMin}
+    max={dataMax}
+    step={(dataMax - dataMin) / 100}
+    value={rangeMin}
+    onChange={(e) => {
+      const value = Number(e.target.value);
+      const adjustedValue = Math.max(dataMin, Math.min(value, rangeMax - (dataMax - dataMin) * 0.01));
+      setRangeMin(adjustedValue);
+    }}
+    className="absolute w-full h-2 bg-transparent appearance-none cursor-pointer opacity-0 z-10"
+  />
+  
+  <input
+    type="range"
+    min={dataMin}
+    max={dataMax}
+    step={(dataMax - dataMin) / 100}
+    value={rangeMax}
+    onChange={(e) => {
+      const value = Number(e.target.value);
+      const adjustedValue = Math.min(dataMax, Math.max(value, rangeMin + (dataMax - dataMin) * 0.01));
+      setRangeMax(adjustedValue);
+    }}
+    className="absolute w-full h-2 bg-transparent appearance-none cursor-pointer opacity-0 z-10"
+  />
+</div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+         
+     
+    </div>
 
     <Separator />
 
@@ -1109,21 +1106,71 @@ return (
       
       <div className="mt-4 sm:mt-6 flex flex-row items-center justify-between">
         
-        <div className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-4 gap-3 ">
+        <div className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-3 gap-3 ">
           
           {selectedYAxes.map(field => (
             <div key={field} className="bg-white dark:bg-slate-950 p-3 rounded-lg border shadow-sm hover:shadow-md transition-shadow">
               <div className="text-xs font-medium text-muted-foreground mb-1 truncate">
                 {formatFieldName(field)}
               </div>
-              <div className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 truncate">
+              <div className="text-sm font-bold text-gray-900 dark:text-gray-100 truncate">
                {formatValue(calculateTotal(field), field)}
               </div>
             </div>
           ))}
           
         </div>
-
+  <TooltipProvider>
+  <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
+    <FormateTooltip>
+      <TooltipTrigger asChild>
+        <Button
+          size="sm"
+          variant={displayFormat === "D" ? "default" : "ghost"}
+          onClick={() => setDisplayFormat("D")}
+          className={`flex-1 text-xs px-2 py-1 ${displayFormat === "D" ? "shadow-sm" : ""}`}
+        >
+          Default
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>Show values in default</p>
+      </TooltipContent>
+    </FormateTooltip>
+    
+    <FormateTooltip>
+      <TooltipTrigger asChild>
+        <Button
+          size="sm"
+          variant={displayFormat === "K" ? "default" : "ghost"}
+          onClick={() => setDisplayFormat("K")}
+          className={`flex-1 text-xs px-2 py-1 ${displayFormat === "K" ? "shadow-sm" : ""}`}
+        >
+          K
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>Show values in thousands</p>
+      </TooltipContent>
+    </FormateTooltip>
+    
+    <FormateTooltip>
+      <TooltipTrigger asChild>
+        <Button
+          size="sm"
+          variant={displayFormat === "M" ? "default" : "ghost"}
+          onClick={() => setDisplayFormat("M")}
+          className={`flex-1 text-xs px-2 py-1 ${displayFormat === "M" ? "shadow-sm" : ""}`}
+        >
+          M
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>Show values in millions</p>
+      </TooltipContent>
+    </FormateTooltip>
+  </div>
+</TooltipProvider>
       </div>
     )}
   </CardHeader>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState , useRef, useCallback} from "react"
 import { Bar, BarChart, Cell, LabelList, XAxis, YAxis, ResponsiveContainer, Legend, Tooltip, LineChart, Line, AreaChart, Area, PieChart, Pie } from "recharts"
 import {Tooltip as FormateTooltip,TooltipProvider, TooltipContent , TooltipTrigger} from "@/components/ui/tooltip"
 import { useAuth } from "@/contexts/AuthContext"
@@ -140,6 +140,64 @@ useEffect(() => {
     setDataLabelPosition("top") // or whatever your default should be
   }
 }, [chartType])
+const [isDragging, setIsDragging] = useState({ min: false, max: false });
+const sliderRef = useRef(null);
+
+// Add these helper functions
+const dataMin = Math.min(...tasks.map(t => parseFloat(t[selectedRangeField]) || 0));
+const dataMax = Math.max(...tasks.map(t => parseFloat(t[selectedRangeField]) || 0));
+
+const valueToPercent = (value) => {
+  return ((value - dataMin) / (dataMax - dataMin)) * 100;
+};
+
+const getValueFromPosition = useCallback((clientX) => {
+  if (!sliderRef.current) return dataMin;
+  
+  const rect = sliderRef.current.getBoundingClientRect();
+  const percent = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+  return dataMin + (percent / 100) * (dataMax - dataMin);
+}, [dataMin, dataMax]);
+
+const handleMouseDown = (type) => (e) => {
+  e.preventDefault();
+  setIsDragging({ ...isDragging, [type]: true });
+};
+
+const handleMouseMove = useCallback((e) => {
+  if (!isDragging.min && !isDragging.max) return;
+  
+  const newValue = getValueFromPosition(e.clientX);
+  
+  if (isDragging.min) {
+    const maxAllowed = rangeMax - (dataMax - dataMin) * 0.01;
+    const adjustedValue = Math.max(dataMin, Math.min(newValue, maxAllowed));
+   setRangeMin(Math.floor(adjustedValue));
+  }
+  
+  if (isDragging.max) {
+    const minAllowed = rangeMin + (dataMax - dataMin) * 0.01;
+    const adjustedValue = Math.min(dataMax, Math.max(newValue, minAllowed));
+    setRangeMax(Math.floor(adjustedValue));
+  }
+}, [isDragging, rangeMin, rangeMax, dataMin, dataMax, getValueFromPosition]);
+
+const handleMouseUp = useCallback(() => {
+  setIsDragging({ min: false, max: false });
+}, []);
+
+// Add this useEffect for global event listeners
+useEffect(() => {
+  if (isDragging.min || isDragging.max) {
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }
+}, [isDragging, handleMouseMove, handleMouseUp]);
 
 const getFieldMaxValue = (fieldName) => {
   if (!fieldName || tasks.length === 0) return 100000; // default fallback
@@ -1193,7 +1251,7 @@ case "stackedDonut":
         return null
     }
   }
-const exportToPDF = async () => {
+  const exportToPDF = async () => {
     try {
       setIsGeneratingPDF(true);
       const chartElement = document.querySelector(`#chart-container-${ChartNo}`);
@@ -1203,29 +1261,124 @@ const exportToPDF = async () => {
         return;
       }
  
+      // Get user data from localStorage
+      const userData = JSON.parse(localStorage.getItem('userData')) || JSON.parse(sessionStorage.getItem('userData'));
+      const currentUserImageData = userData?.userAvatar
+        ? (userData.userAvatar.startsWith('data:') ? userData.userAvatar : `data:image/jpeg;base64,${userData.userAvatar}`)
+        : null;
+      const currentUserName = userData?.userName || '';
+      const companyLogoData = userData?.companyLogo
+        ? (userData.companyLogo.startsWith('data:') ? userData.companyLogo : `data:image/jpeg;base64,${userData.companyLogo}`)
+        : null;
+ 
       // Create a temporary container with fixed dimensions
       const tempContainer = document.createElement('div');
-      tempContainer.style.width = '1000px'; // Fixed width for better control
+      tempContainer.style.width = '1000px';
       tempContainer.style.padding = '20px';
+      tempContainer.style.paddingTop = '10px';
       tempContainer.style.backgroundColor = 'white';
       tempContainer.style.boxSizing = 'border-box';
       tempContainer.style.position = 'fixed';
-      tempContainer.style.left = '-9999px'; // Move off-screen
+      tempContainer.style.left = '-9999px';
       tempContainer.style.top = '0';
       tempContainer.style.color = '#000000';
       tempContainer.style.fontFamily = 'Arial, sans-serif';
  
-      // Add title
+      // Create header container with three columns
+      const header = document.createElement('div');
+      header.style.display = 'flex';
+      header.style.justifyContent = 'space-between';
+      header.style.alignItems = 'flex-start';
+      header.style.marginBottom = '20px';
+      header.style.borderBottom = '1px solid #ddd';
+      header.style.paddingBottom = '15px';
+ 
+      // Left column - Company logo and details
+      const leftColumn = document.createElement('div');
+      leftColumn.style.flex = '0 0 auto';
+      leftColumn.style.display = 'flex';
+      leftColumn.style.alignItems = 'flex-start';
+ 
+      // Company logo
+      if (companyLogoData) {
+        const companyLogo = document.createElement('img');
+        companyLogo.src = companyLogoData;
+        companyLogo.style.width = '100px';
+        companyLogo.style.height = '80px';
+        companyLogo.style.objectFit = 'cover';
+        leftColumn.appendChild(companyLogo);
+      }
+ 
+      // Company details container
+      const companyDetailsContainer = document.createElement('div');
+      companyDetailsContainer.style.display = 'flex';
+      companyDetailsContainer.style.flexDirection = 'column';
+ 
+      const companyTitle = document.createElement('h3');
+      companyTitle.textContent = userData?.companyName || 'N/A';
+      companyTitle.style.fontSize = '18px';
+      companyTitle.style.fontWeight = 'bold';
+      companyTitle.style.marginBottom = '5px';
+      companyTitle.style.color = '#1e40af';
+ 
+      const companyAddress = document.createElement('div');
+      companyAddress.innerHTML = `Company Address: ${userData?.companyAddress || 'N/A'}<br>`;
+      companyAddress.style.fontSize = '13px';
+      companyAddress.style.lineHeight = '1.4';
+      companyAddress.style.marginBottom = '5px';
+ 
+      const companyContact = document.createElement('div');
+      companyContact.innerHTML = `Email: ${userData?.userEmail || 'N/A'}<br>`;
+      companyContact.style.fontSize = '13px';
+      companyContact.style.lineHeight = '1.4';
+ 
+      companyDetailsContainer.appendChild(companyTitle);
+      companyDetailsContainer.appendChild(companyAddress);
+      companyDetailsContainer.appendChild(companyContact);
+      leftColumn.appendChild(companyDetailsContainer);
+ 
+      header.appendChild(leftColumn);
+ 
+      // Middle column - PDF title (centered)
+      const middleColumn = document.createElement('div');
+      middleColumn.style.flex = '1';
+      middleColumn.style.textAlign = 'center';
+      middleColumn.style.display = 'flex';
+      middleColumn.style.flexDirection = 'column';
+      middleColumn.style.alignItems = 'center';
+      middleColumn.style.justifyContent = 'center';
+ 
+      const pdfTitle = document.createElement('h3');
+      pdfTitle.textContent = 'HR Overview';
+      pdfTitle.style.fontSize = '22px';
+      pdfTitle.style.fontWeight = 'bold';
+      pdfTitle.style.marginBottom = '5px';
+      pdfTitle.style.color = 'black';
+ 
+      middleColumn.appendChild(pdfTitle);
+      header.appendChild(middleColumn);
+ 
+      // Right column - Date and time
+      const rightColumn = document.createElement('div');
+      rightColumn.style.flex = '0 0 auto';
+      rightColumn.style.textAlign = 'right';
+ 
+      header.appendChild(rightColumn);
+      tempContainer.appendChild(header);
+ 
+      // Add centered title
       const title = document.createElement('h2');
       title.textContent = customTitle;
-      title.style.fontSize = '20px';
+      title.style.fontSize = '22px';
       title.style.fontWeight = 'bold';
       title.style.marginBottom = '20px';
       title.style.textAlign = 'center';
       title.style.color = '#000000';
+      title.style.textRendering = 'optimizeLegibility';
+      title.style.webkitFontSmoothing = 'antialiased';
       tempContainer.appendChild(title);
  
-      // Clone the chart element and force light mode styles
+      // Rest of your existing content (chart, table, etc.)
       const chartClone = chartElement.cloneNode(true);
  
       // Apply light mode styles to the cloned chart
@@ -1235,15 +1388,23 @@ const exportToPDF = async () => {
       // Find and modify all elements within the chart to ensure visibility
       const elements = chartClone.querySelectorAll('*');
       elements.forEach(el => {
-        // Force text color to black
-        if (window.getComputedStyle(el).color.includes('rgb(255, 255, 255)')) {
-          el.style.color = '#000000';
+        // Force text color to black and improve rendering
+        el.style.color = '#000000';
+ 
+        // Improve text rendering for all text elements
+        if (el.tagName === 'text' || el.tagName === 'tspan') {
+          el.style.fill = '#000000';
+          el.style.stroke = 'none';
+          el.style.textRendering = 'optimizeLegibility';
+          el.style.webkitFontSmoothing = 'antialiased';
         }
+ 
         // Force background to white if it's dark
         if (window.getComputedStyle(el).backgroundColor.includes('rgb(3, 7, 18)') ||
           window.getComputedStyle(el).backgroundColor.includes('rgba(0, 0, 0, 0)')) {
           el.style.backgroundColor = 'white';
         }
+ 
         // Force stroke colors to be visible
         if (el.tagName === 'path' || el.tagName === 'line' || el.tagName === 'rect') {
           const stroke = el.getAttribute('stroke');
@@ -1257,14 +1418,16 @@ const exportToPDF = async () => {
       chartClone.style.marginBottom = '20px';
       tempContainer.appendChild(chartClone);
  
-      // Create table
+      // Create table with improved text rendering
       const table = document.createElement('table');
       table.style.width = '100%';
       table.style.borderCollapse = 'collapse';
       table.style.fontFamily = 'Arial, sans-serif';
-      table.style.fontSize = '10px'; // Smaller font for table
+      table.style.fontSize = '15px';
       table.style.marginTop = '20px';
       table.style.color = '#000000';
+      table.style.textRendering = 'optimizeLegibility';
+      table.style.webkitFontSmoothing = 'antialiased';
  
       // Table header
       const thead = document.createElement('thead');
@@ -1274,19 +1437,21 @@ const exportToPDF = async () => {
  
       const categoryHeader = document.createElement('th');
       categoryHeader.textContent = 'Category';
-      categoryHeader.style.padding = '8px';
+      categoryHeader.style.padding = '10px';
       categoryHeader.style.textAlign = 'left';
       categoryHeader.style.border = '1px solid #000000';
       categoryHeader.style.fontWeight = 'bold';
+      categoryHeader.style.fontSize = '15px';
       headerRow.appendChild(categoryHeader);
  
       selectedYAxes.forEach(field => {
         const th = document.createElement('th');
         th.textContent = formatFieldName(field);
-        th.style.padding = '8px';
+        th.style.padding = '10px';
         th.style.textAlign = 'right';
         th.style.border = '1px solid #000000';
         th.style.fontWeight = 'bold';
+        th.style.fontSize = '15px';
         headerRow.appendChild(th);
       });
  
@@ -1295,14 +1460,14 @@ const exportToPDF = async () => {
  
       // Table body
       const tbody = document.createElement('tbody');
-      chartData.slice(0, 50).forEach((row, index) => { // Limit to 50 rows for size
+      chartData.slice(0, 40).forEach((row, index) => {
         const tr = document.createElement('tr');
         tr.style.border = '1px solid #000000';
         tr.style.backgroundColor = index % 2 === 0 ? '#ffffff' : '#f8f8f8';
  
         const categoryCell = document.createElement('td');
-        categoryCell.textContent = row.combinedKey.length > 50 ?
-          row.combinedKey.substring(0, 47) + '...' : row.combinedKey;
+        categoryCell.textContent = row.combinedKey.length > 45 ?
+          row.combinedKey.substring(0, 42) + '...' : row.combinedKey;
         categoryCell.style.padding = '8px';
         categoryCell.style.textAlign = 'left';
         categoryCell.style.border = '1px solid #000000';
@@ -1323,42 +1488,167 @@ const exportToPDF = async () => {
       table.appendChild(tbody);
       tempContainer.appendChild(table);
  
+      // Create footer with date/time on right and page number centered
+      const footer = document.createElement('div');
+      footer.style.display = 'flex';
+      footer.style.justifyContent = 'space-between';
+      footer.style.alignItems = 'center';
+      footer.style.marginTop = '20px';
+      footer.style.paddingTop = '10px';
+      footer.style.borderTop = '1px solid #ddd';
+      footer.style.fontSize = '12px';
+      footer.style.color = '#666';
+ 
+      // Current date/time for footer (right side)
+      const currentDate = new Date();
+      const formattedDateTime = currentDate.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
+ 
+      const dateTimeFooter = document.createElement('div');
+      dateTimeFooter.textContent = formattedDateTime;
+      dateTimeFooter.style.textAlign = 'right';
+ 
+      // Page number placeholder (centered)
+      const pageInfo = document.createElement('div');
+      pageInfo.id = 'page-info';
+      pageInfo.style.textAlign = 'center';
+      pageInfo.style.flex = '1'; // Take up remaining space to center properly
+ 
+      // Empty div to balance the flex layout
+      const emptyDiv = document.createElement('div');
+      emptyDiv.style.width = dateTimeFooter.offsetWidth + 'px'; // Match width of dateTimeFooter
+ 
+      footer.appendChild(emptyDiv);
+      footer.appendChild(pageInfo);
+      footer.appendChild(dateTimeFooter);
+      tempContainer.appendChild(footer);
+ 
       // Add to document temporarily
       document.body.appendChild(tempContainer);
  
-      // Generate PDF
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: 'a4'
-      });
- 
-      // Convert to canvas with quality settings for smaller file size
+      // Generate high-quality canvas
       const canvas = await html2canvas(tempContainer, {
-        scale: 1.5, // Reduced from 2 to decrease size
+        scale: 3,
         logging: false,
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
-        quality: 0.8, // Reduce quality to decrease size
-        removeContainer: true
+        onclone: (clonedDoc) => {
+          // Ensure all fonts are loaded in the cloned document
+          const style = clonedDoc.createElement('style');
+          style.textContent = `
+          * {
+            text-rendering: optimizeLegibility !important;
+            -webkit-font-smoothing: antialiased !important;
+            -moz-osx-font-smoothing: grayscale !important;
+          }
+        `;
+          clonedDoc.head.appendChild(style);
+        }
       });
  
-      // Add image to PDF with compression
-      const imgData = canvas.toDataURL('image/jpeg', 0.8); // Use JPEG with quality 0.8
+      // Create PDF with vector-like quality
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+        compress: true
+      });
  
-      // Calculate dimensions to fit the page
+      // Convert canvas to high-quality image with smart compression
+      let quality = 0.95;
+      let imgData;
+      let attempts = 0;
+      const maxAttempts = 5;
+ 
+      do {
+        imgData = canvas.toDataURL('image/png'); // Use PNG for text clarity
+ 
+        // Check approximate size
+        const approximateSize = (imgData.length * 0.75) / (1024 * 1024); // Size in MB
+ 
+        if (approximateSize <= 2 || attempts >= maxAttempts) {
+          break;
+        }
+ 
+        // If too large, reduce quality and try JPEG
+        quality -= 0.1;
+        imgData = canvas.toDataURL('image/jpeg', quality);
+        attempts++;
+      } while (attempts < maxAttempts);
+ 
+      // Calculate dimensions to fit the page while maintaining aspect ratio
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
-      const ratio = Math.min(
-        (pdfWidth - 20) / canvas.width,
-        (pdfHeight - 20) / canvas.height
+ 
+      // Reduce margins to start content at top (minimal top margin)
+      const marginTop = 5; // Very small top margin
+      const marginSide = 10; // Side margins
+      const marginBottom = 15; // Bottom margin for page numbers
+ 
+      const maxWidth = pdfWidth - (marginSide * 2);
+      const maxHeight = pdfHeight - marginTop - marginBottom;
+ 
+      const canvasAspectRatio = canvas.width / canvas.height;
+      const pageAspectRatio = maxWidth / maxHeight;
+ 
+      let finalWidth, finalHeight;
+ 
+      if (canvasAspectRatio > pageAspectRatio) {
+        // Canvas is wider relative to page
+        finalWidth = maxWidth;
+        finalHeight = maxWidth / canvasAspectRatio;
+      } else {
+        // Canvas is taller relative to page
+        finalHeight = maxHeight;
+        finalWidth = maxHeight * canvasAspectRatio;
+      }
+ 
+      const centerX = (pdfWidth - finalWidth) / 2;
+      const startY = marginTop; // Start from top with minimal margin
+ 
+      // Add image with optimal settings for text clarity
+      pdf.addImage(
+        imgData,
+        imgData.startsWith('data:image/png') ? 'PNG' : 'JPEG',
+        centerX,
+        startY,
+        finalWidth,
+        finalHeight,
+        undefined,
+        'SLOW' // Use SLOW compression for better quality
       );
  
-      const centerX = (pdfWidth - canvas.width * ratio) / 2;
-      const centerY = (pdfHeight - canvas.height * ratio) / 2;
+      // Add page numbers centered and date/time on right side
+      const pageCount = pdf.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        pdf.setPage(i);
+        pdf.setFontSize(10);
+        pdf.setTextColor(100);
  
-      pdf.addImage(imgData, 'JPEG', centerX, centerY, canvas.width * ratio, canvas.height * ratio);
+        // Add page number centered
+        pdf.text(
+          `Page ${i} of ${pageCount}`,
+          pdfWidth / 2,
+          pdfHeight - 10,
+          { align: 'center' }
+        );
+ 
+        // Add date/time on right side
+        pdf.text(
+          formattedDateTime,
+          pdfWidth - 15,
+          pdfHeight - 10,
+          { align: 'right' }
+        );
+      }
  
       // Clean up
       document.body.removeChild(tempContainer);
@@ -1374,6 +1664,7 @@ const exportToPDF = async () => {
       setIsGeneratingPDF(false);
     }
   };
+ 
 
 return (
 <Card className="w-full bg-white dark:bg-slate-950 border shadow-sm">
@@ -2136,62 +2427,90 @@ return (
                   <span className="text-blue-700 dark:text-blue-300 truncate">
                     {formatFieldName(selectedRangeField)}
                   </span>
-                  <div className="flex items-center space-x-1 font-mono bg-white dark:bg-slate-800 px-2 py-1 rounded border text-xs">
-                    <span className="text-blue-600 dark:text-blue-400">{formatValue(rangeMin)}</span>
-                    <span className="text-gray-400">-</span>
-                    <span className="text-blue-600 dark:text-blue-400">{formatValue(rangeMax)}</span>
-                  </div>
+                 <div className="flex items-center space-x-1 font-mono bg-white dark:bg-slate-800 px-1 py-1 rounded border text-xs">
+  <input
+    type="text"
+    value={rangeMin}
+    onChange={(e) => {
+      const raw = e.target.value;
+      const num = Number(raw);
+      if (!isNaN(num)) setRangeMin(num);
+    }}
+    className="w-10 bg-transparent text-blue-600 dark:text-blue-400 text-right outline-none"
+  />
+  <span className="text-gray-400">-</span>
+  <input
+    type="text"
+    value={rangeMax}
+    onChange={(e) => {
+      const raw = e.target.value;
+      const num = Number(raw);
+      if (!isNaN(num)) setRangeMax(num);
+    }}
+    className="w-10 bg-transparent text-blue-600 dark:text-blue-400 text-right outline-none"
+  />
+</div>
+
                 </div>
                 
                 {/* Compact Range Slider */}
-                <div className="relative w-full h-6 flex items-center">
-                  <div className="absolute w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg shadow-inner"></div>
-                  <div 
-                    className="absolute h-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg shadow-md"
-                    style={{
-                      left: `${((rangeMin - Math.min(...tasks.map(t => parseFloat(t[selectedRangeField]) || 0))) / 
-                              (Math.max(...tasks.map(t => parseFloat(t[selectedRangeField]) || 0)) - 
-                              Math.min(...tasks.map(t => parseFloat(t[selectedRangeField]) || 0)))) * 100}%`,
-                      width: `${((rangeMax - rangeMin) / 
-                                (Math.max(...tasks.map(t => parseFloat(t[selectedRangeField]) || 0)) - 
-                                Math.min(...tasks.map(t => parseFloat(t[selectedRangeField]) || 0)))) * 100}%`
-                    }}
-                  ></div>
-                  
-                  <input
-                    type="range"
-                    min={Math.min(...tasks.map(t => parseFloat(t[selectedRangeField]) || 0))}
-                    max={Math.max(...tasks.map(t => parseFloat(t[selectedRangeField]) || 0))}
-                    step={(Math.max(...tasks.map(t => parseFloat(t[selectedRangeField]) || 0)) - 
-                          Math.min(...tasks.map(t => parseFloat(t[selectedRangeField]) || 0))) / 100}
-                    value={rangeMin}
-                    onChange={(e) => {
-                      const value = Number(e.target.value);
-                      const maxValue = Math.max(...tasks.map(t => parseFloat(t[selectedRangeField]) || 0));
-                      const minValue = Math.min(...tasks.map(t => parseFloat(t[selectedRangeField]) || 0));
-                      const adjustedValue = Math.max(minValue, Math.min(value, rangeMax - ((maxValue - minValue) * 0.01)));
-                      setRangeMin(adjustedValue);
-                    }}
-                    className="absolute w-full h-2 bg-transparent appearance-none cursor-pointer slider-thumb-blue z-10"
-                  />
-                  
-                  <input
-                    type="range"
-                    min={Math.min(...tasks.map(t => parseFloat(t[selectedRangeField]) || 0))}
-                    max={Math.max(...tasks.map(t => parseFloat(t[selectedRangeField]) || 0))}
-                    step={(Math.max(...tasks.map(t => parseFloat(t[selectedRangeField]) || 0)) - 
-                          Math.min(...tasks.map(t => parseFloat(t[selectedRangeField]) || 0))) / 100}
-                    value={rangeMax}
-                    onChange={(e) => {
-                      const value = Number(e.target.value);
-                      const maxValue = Math.max(...tasks.map(t => parseFloat(t[selectedRangeField]) || 0));
-                      const minValue = Math.min(...tasks.map(t => parseFloat(t[selectedRangeField]) || 0));
-                      const adjustedValue = Math.min(maxValue, Math.max(value, rangeMin + ((maxValue - minValue) * 0.01)));
-                      setRangeMax(adjustedValue);
-                    }}
-                    className="absolute w-full h-2 bg-transparent appearance-none cursor-pointer slider-thumb-indigo z-10"
-                  />
-                </div>
+                <div className="relative w-full h-6 flex items-center" ref={sliderRef}>
+  <div className="absolute w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg shadow-inner"></div>
+  <div
+    className="absolute h-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg shadow-md"
+    style={{
+      left: `${valueToPercent(rangeMin)}%`,
+      width: `${valueToPercent(rangeMax) - valueToPercent(rangeMin)}%`
+    }}
+  ></div>
+  
+  {/* Min thumb */}
+  <div
+    className={`absolute w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-lg cursor-pointer transform -translate-x-1/2 z-20 transition-transform hover:scale-110 ${
+      isDragging.min ? 'scale-110' : ''
+    }`}
+    style={{ left: `${valueToPercent(rangeMin)}%` }}
+    onMouseDown={handleMouseDown('min')}
+  />
+  
+  {/* Max thumb */}
+  <div
+    className={`absolute w-4 h-4 bg-indigo-500 border-2 border-white rounded-full shadow-lg cursor-pointer transform -translate-x-1/2 z-20 transition-transform hover:scale-110 ${
+      isDragging.max ? 'scale-110' : ''
+    }`}
+    style={{ left: `${valueToPercent(rangeMax)}%` }}
+    onMouseDown={handleMouseDown('max')}
+  />
+  
+  {/* Hidden range inputs for accessibility and keyboard support */}
+  <input
+    type="range"
+    min={dataMin}
+    max={dataMax}
+    step={(dataMax - dataMin) / 100}
+    value={rangeMin}
+    onChange={(e) => {
+      const value = Number(e.target.value);
+      const adjustedValue = Math.max(dataMin, Math.min(value, rangeMax - (dataMax - dataMin) * 0.01));
+      setRangeMin(Math.floor(adjustedValue));
+    }}
+    className="absolute w-full h-2 bg-transparent appearance-none cursor-pointer opacity-0 z-10"
+  />
+  
+  <input
+    type="range"
+    min={dataMin}
+    max={dataMax}
+    step={(dataMax - dataMin) / 100}
+    value={rangeMax}
+    onChange={(e) => {
+      const value = Number(e.target.value);
+      const adjustedValue = Math.min(dataMax, Math.max(value, rangeMin + (dataMax - dataMin) * 0.01));
+      setRangeMax(Math.floor(adjustedValue));
+    }}
+    className="absolute w-full h-2 bg-transparent appearance-none cursor-pointer opacity-0 z-10"
+  />
+</div>
               </div>
             </div>
           </div>
@@ -2208,14 +2527,14 @@ return (
       
       <div className="mt-4 sm:mt-6 flex flex-row items-center justify-between">
         
-        <div className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-4 gap-3 ">
+        <div className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-3 gap-3 ">
           
           {selectedYAxes.map(field => (
             <div key={field} className="bg-white dark:bg-slate-950 p-3 rounded-lg border shadow-sm hover:shadow-md transition-shadow">
               <div className="text-xs font-medium text-muted-foreground mb-1 truncate">
                 {formatFieldName(field)}
               </div>
-              <div className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 truncate">
+              <div className="text-sm font-bold text-gray-900 dark:text-gray-100 truncate">
                {formatValue(calculateTotal(field), field)}
               </div>
             </div>

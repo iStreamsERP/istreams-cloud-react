@@ -1,11 +1,6 @@
 import { useEffect, useState } from "react"
 import { Bar, BarChart, Cell, LabelList, XAxis, YAxis, ResponsiveContainer, Legend, Tooltip, LineChart, Line, AreaChart, Area, PieChart, Pie } from "recharts"
-import {
-  Tooltip as FormateTooltip,
-  TooltipProvider,
-  TooltipContent ,
-  TooltipTrigger ,
-} from "@/components/ui/tooltip"
+import {Tooltip as FormateTooltip,TooltipProvider, TooltipContent , TooltipTrigger} from "@/components/ui/tooltip"
 import { useAuth } from "@/contexts/AuthContext"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -426,9 +421,8 @@ const formatValue = (value, fieldName = '') => {
   }
   
   // Check if currency is INR (Indian Rupee)
-  const isINR = userData?.companyCurrIsIndianStandard === true;
-  const prefix = shouldShowCurrency ? currencySymbol : '';
-
+  const isINR = userData.companyCurrIsIndianStandard === false;
+  const prefix = shouldShowCurrency ? `${currencySymbol} ` : '';
   switch (displayFormat) {
     case "K":
       if (isINR) {

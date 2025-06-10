@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
 import {
+  Bell,
+  BellOff,
   CloudMoon,
   CloudSun,
   LogOut,
@@ -28,6 +30,7 @@ import {
 import PropTypes from "prop-types";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import Notification from "@/components/Notification";
 
 export const Header = ({ collapsed, setCollapsed }) => {
   const { userData, logout } = useAuth();
@@ -36,6 +39,8 @@ export const Header = ({ collapsed, setCollapsed }) => {
   const navigate = useNavigate();
 
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showNotification, setShowNotification] = useState(true); // Default notification is on
+
   const toggleFullScreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen();
@@ -46,6 +51,10 @@ export const Header = ({ collapsed, setCollapsed }) => {
         setIsFullscreen(false);
       }
     }
+  };
+
+  const toggleNotification = () => {
+    setShowNotification(!showNotification);
   };
 
   const handleLogout = () => {
@@ -72,6 +81,20 @@ export const Header = ({ collapsed, setCollapsed }) => {
           {/* <div className="border border-gray-700 px-2 py-2 rounded-lg text-sm font-semibold hidden lg:block">
             {userData.organization}
           </div> */}
+
+          {/* Notification Toggle Button */}
+          <Button
+            variant="ghost"
+            onClick={toggleNotification}
+            className="relative"
+            title={showNotification ? "Hide notifications" : "Show notifications"}
+          >
+            {showNotification ? (
+              <Bell className="h-5 w-5" />
+            ) : (
+              <BellOff className="h-5 w-5 text-gray-400" />
+            )}
+          </Button>
 
           <Button
             variant="ghost"
@@ -118,6 +141,8 @@ export const Header = ({ collapsed, setCollapsed }) => {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+        {/* Conditionally render the Notification component */}
+        {showNotification && <Notification />}
       </nav>
     </header>
   );
@@ -127,10 +152,3 @@ Header.propTypes = {
   collapsed: PropTypes.bool,
   setCollapsed: PropTypes.func,
 };
-
-
-
-
-
-
-

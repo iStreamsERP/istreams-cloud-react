@@ -123,57 +123,17 @@ const Chat = () => {
   return email.replace(/[@.]/g, '_').toLowerCase();
 };
 
+// 1. Fix the convertPeerIdToEmail function
 const convertPeerIdToEmail = (peerId) => {
-  // Convert peer ID back to email format
-  return peerId.replace(/_/g, '@').replace('@', '@').replace('@', '.');
-};
-// Updated initializePeer function
-const initializePeer = () => {
-  const peerId = convertEmailToPeerId(userData.userEmail.toLowerCase());
-  console.log('Creating peer with ID:', peerId);
-  
-  if (peer) {
-    peer.destroy();
+  // Convert peer ID back to email format - fix the logic
+  const parts = peerId.split('_');
+  if (parts.length >= 2) {
+    return parts[0] + '@' + parts.slice(1).join('.');
   }
- const peerInstance = new window.Peer(peerId, {
-    host: '0.peerjs.com',
-    port: 443,
-    path: '/',
-    secure: true,
-    debug: 1,
-    config: {
-      'iceServers': [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:global.stun.twilio.com:3478' }
-      ]
-    }
-  });
-
-  peerInstance.on('open', (id) => {
-    console.log('Peer connected with ID:', id);
-    setPeer(peerInstance);
-  });
-
-  peerInstance.on('call', handleIncomingCall); // Use the new handler
-
-  peerInstance.on('error', (error) => {
-    console.error('Peer error:', error);
-    setCallError('Connection error. Please refresh and try again.');
-    setShowCallError(true);
-  });
-
-  peerInstance.on('disconnected', () => {
-    console.log('Peer disconnected, attempting to reconnect...');
-    setTimeout(() => {
-      if (!peerInstance.destroyed) {
-        peerInstance.reconnect();
-      }
-    }, 1000);
-  });
+  return peerId + '@demo.com'; // fallback
 };
 
-
-// Updated startCall function
+// 2. Update the startCall function - replace the existing one
 const startCall = async (type) => {
   if (!peer || !selectedUser) {
     setCallError('Connection not ready. Please try again.');
@@ -207,10 +167,13 @@ const startCall = async (type) => {
       localVideoRef.current.srcObject = stream;
     }
 
+    // Fix: Use proper email format for recipient
     const recipientEmail = selectedUser.toLowerCase() + '@demo.com';
     const recipientPeerId = convertEmailToPeerId(recipientEmail);
     console.log('Calling user:', selectedUser);
+    console.log('Recipient email:', recipientEmail);
     console.log('Recipient peer ID:', recipientPeerId);
+    console.log('My peer ID:', peer.id);
     
     setCallStatus('connecting');
     const call = peer.call(recipientPeerId, stream);
@@ -231,14 +194,8 @@ const startCall = async (type) => {
           ringtone.currentTime = 0;
         }
         
-        // Check if peer exists but didn't answer
-        if (peer.connections[recipientPeerId]) {
-          setCallStatus('no-answer');
-          setCallError(`${selectedUser} didn't answer the call.`);
-        } else {
-          setCallStatus('offline');
-          setCallError(`${selectedUser} is currently offline or unavailable.`);
-        }
+        setCallStatus('no-answer');
+        setCallError(`${selectedUser} didn't answer the call.`);
         setShowCallError(true);
         endCall();
       }
@@ -261,6 +218,9 @@ const startCall = async (type) => {
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = remoteStream;
       }
+      
+      // Start call duration timer
+      setCallDuration(0);
     });
 
     call.on('close', () => {
@@ -323,6 +283,191 @@ const startCall = async (type) => {
     endCall();
   }
 };
+
+// 3. Update the handleIncomingCall function - DON'T spread the call object
+const handleIncomingCall = (call) => {
+  console.log('Incoming call from peer:', call.peer);
+  console.log('Converting peer ID to email:', call.peer);
+  
+  // Fix: Better peer ID to username conversion
+  let callerUsername;
+  if (call.peer.includes('_')) {
+    const callerEmail = convertPeerIdToEmail(call.peer);
+    console.log('Caller email:', callerEmail);
+    callerUsername = callerEmail.replace('@demo.com', '');
+  } else {
+    callerUsername = call.peer;
+  }
+  
+  console.log('Caller username:', callerUsername);
+  
+  const callerUser = users.find(user => 
+    user.user_name.toLowerCase() === callerUsername.toLowerCase()
+  );
+  const callerName = callerUser ? callerUser.user_name : callerUsername;
+  
+  // DON'T spread the call object - keep it intact and add username separately
+  call.callerUsername = callerName;
+  setIncomingCall(call);
+  setShowCallModal(true);
+  setCallStatus('incoming');
+  
+  // Play incoming call ringtone
+  if (ringtone) {
+    ringtone.currentTime = 0;
+    ringtone.play().catch(console.error);
+  }
+};
+
+// 4. Fixed answerCall function 
+const answerCall = async () => {
+  if (!incomingCall) return;
+
+  try {
+    // Stop ringtone
+    if (ringtone) {
+      ringtone.pause();
+      ringtone.currentTime = 0;
+    }
+
+    const constraints = {
+      video: true,
+      audio: true
+    };
+
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    setLocalStream(stream);
+    setCallType('video');
+    setIsInCall(true);
+    setCallStatus('connecting');
+
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = stream;
+    }
+
+    // Answer the call with our stream - incomingCall is the actual call object
+    incomingCall.answer(stream);
+    setCurrentCall(incomingCall);
+
+    incomingCall.on('stream', (remoteStream) => {
+      console.log('Received remote stream in answer');
+      setRemoteStream(remoteStream);
+      setIsCallConnected(true);
+      setCallStatus('connected');
+      setCallDuration(0); // Start duration counter
+      
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = remoteStream;
+      }
+    });
+
+    incomingCall.on('close', () => {
+      console.log('Incoming call closed');
+      endCall();
+    });
+
+    incomingCall.on('error', (error) => {
+      console.error('Answer call error:', error);
+      setCallError('Failed to establish connection.');
+      setShowCallError(true);
+      endCall();
+    });
+
+    setIncomingCall(null);
+  } catch (error) {
+    console.error('Error answering call:', error);
+    setCallError('Failed to answer call. Please check your camera/microphone permissions.');
+    setShowCallError(true);
+    rejectCall();
+  }  
+};
+
+// 5. Fixed rejectCall function
+const rejectCall = () => {
+  if (ringtone) {
+    ringtone.pause();
+    ringtone.currentTime = 0;
+  }
+  
+  if (incomingCall) {
+    // Use the correct method to close the call
+    incomingCall.close();
+    setIncomingCall(null);
+  }
+  setShowCallModal(false);
+  setCallStatus('');
+};
+
+// 5. Add better peer initialization with debug logging
+const initializePeer = () => {
+  const peerId = convertEmailToPeerId(userData.userEmail.toLowerCase());
+  console.log('User email:', userData.userEmail);
+  console.log('Creating peer with ID:', peerId);
+  
+  if (peer) {
+    peer.destroy();
+  }
+  
+  const peerInstance = new window.Peer(peerId, {
+    host: '0.peerjs.com',
+    port: 443,
+    path: '/',
+    secure: true,
+    debug: 2, // Increase debug level
+    config: {
+      'iceServers': [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:global.stun.twilio.com:3478' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
+    }
+  });
+
+  peerInstance.on('open', (id) => {
+    console.log('Peer connected successfully with ID:', id);
+    console.log('Ready to make/receive calls');
+    setPeer(peerInstance);
+  });
+
+  peerInstance.on('call', handleIncomingCall);
+
+  peerInstance.on('error', (error) => {
+    console.error('Peer error:', error);
+    
+    let errorMessage = 'Connection error. Please refresh and try again.';
+    if (error.type === 'peer-unavailable') {
+      errorMessage = 'User is currently unavailable.';
+    } else if (error.type === 'network') {
+      errorMessage = 'Network connection problem.';
+    } else if (error.type === 'peer-destroyed') {
+      errorMessage = 'Connection was destroyed. Reconnecting...';
+      // Auto-reconnect after a delay
+      setTimeout(() => {
+        initializePeer();
+      }, 2000);
+      return;
+    }
+    
+    setCallError(errorMessage);
+    setShowCallError(true);
+  });
+
+  peerInstance.on('disconnected', () => {
+    console.log('Peer disconnected, attempting to reconnect...');
+    setTimeout(() => {
+      if (!peerInstance.destroyed) {
+        peerInstance.reconnect();
+      }
+    }, 1000);
+  });
+
+  peerInstance.on('connection', (conn) => {
+    console.log('Data connection established with:', conn.peer);
+  });
+};
+
+// 3. Update the handleIncomingCall function
+
 // Enhanced Call Status Display Component
 const CallStatusDisplay = () => {
   const getStatusText = () => {
@@ -547,92 +692,8 @@ const findActivePeerForUser = async (username) => {
     }
   };
 
-const handleIncomingCall = (call) => {
-  console.log('Incoming call from:', call.peer);
-  const callerEmail = convertPeerIdToEmail(call.peer);
-  console.log('Caller email:', callerEmail);
-  
-  const callerUsername = callerEmail.replace('@demo.com', '').toLowerCase();
-  const callerUser = users.find(user => user.user_name.toLowerCase() === callerUsername);
-  const callerName = callerUser ? callerUser.user_name : callerUsername;
-  
-  setIncomingCall({ ...call, callerUsername: callerName });
-  setShowCallModal(true);
-  setCallStatus('incoming');
-  
-  // Play incoming call ringtone (browser default or custom)
-  if (ringtone) {
-    ringtone.currentTime = 0;
-    ringtone.play().catch(console.error);
-  }
-};
 
-// 6. Enhanced answerCall function
-const answerCall = async () => {
-  if (!incomingCall) return;
 
-  try {
-    // Stop ringtone
-    if (ringtone) {
-      ringtone.pause();
-      ringtone.currentTime = 0;
-    }
-
-    const constraints = {
-      video: true,
-      audio: true
-    };
-
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    setLocalStream(stream);
-    setCallType('video');
-    setIsInCall(true);
-    setCallStatus('connecting');
-
-    if (localVideoRef.current) {
-      localVideoRef.current.srcObject = stream;
-    }
-
-    incomingCall.answer(stream);
-    setCurrentCall(incomingCall);
-
-    incomingCall.on('stream', (remoteStream) => {
-      console.log('Received remote stream');
-      setRemoteStream(remoteStream);
-      setIsCallConnected(true);
-      setCallStatus('connected');
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = remoteStream;
-      }
-    });
-
-    incomingCall.on('close', () => {
-      endCall();
-    });
-
-    setIncomingCall(null);
-  } catch (error) {
-    console.error('Error answering call:', error);
-    setCallError('Failed to answer call. Please check your camera/microphone permissions.');
-    setShowCallError(true);
-    rejectCall();
-  }
-};
-
-// 7. Enhanced rejectCall function
-const rejectCall = () => {
-  if (ringtone) {
-    ringtone.pause();
-    ringtone.currentTime = 0;
-  }
-  
-  if (incomingCall) {
-    incomingCall.close();
-    setIncomingCall(null);
-  }
-  setShowCallModal(false);
-  setCallStatus('');
-};
 
 // 8. Enhanced endCall function
 const endCall = () => {

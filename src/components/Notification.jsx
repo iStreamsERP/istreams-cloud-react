@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronRight, MessageSquare, X } from "lucide-react";
+import { ChevronRight, MessageSquare, X, Bell } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { callSoapService } from "@/services/callSoapService";
 
@@ -11,7 +11,128 @@ const DEFAULT_IMAGE = "/default-user.png"; // should be round image
 const FETCH_INTERVAL = 15000; // More frequent updates (15 seconds)
 const PLACEHOLDER_COUNT = 3;
 
-// Custom Notification Popup Component
+// Enhanced Notification Popup Component for All Messages
+const AllMessagesNotificationPopup = ({ notifications, onClose, onMessageClick }) => {
+  const [isVisible, setIsVisible] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    if (notifications && notifications.length > 0) {
+      setIsVisible(true);
+      setCurrentIndex(0);
+      
+      // Auto-cycle through notifications every 3 seconds
+      const cycleTimer = setInterval(() => {
+        setCurrentIndex(prev => {
+          const nextIndex = (prev + 1) % notifications.length;
+          // Close after showing all notifications
+          if (nextIndex === 0 && prev === notifications.length - 1) {
+            setTimeout(() => handleClose(), 500);
+          }
+          return nextIndex;
+        });
+      }, 3000);
+      
+      return () => clearInterval(cycleTimer);
+    }
+  }, [notifications]);
+
+  const handleClose = () => {
+    setIsLeaving(true);
+    setTimeout(() => {
+      setIsVisible(false);
+      setIsLeaving(false);
+      onClose();
+    }, 300);
+  };
+
+  const handleNotificationClick = (notification) => {
+    if (notification && onMessageClick) {
+      onMessageClick(notification.userName);
+      handleClose();
+    }
+  };
+
+  if (!notifications || notifications.length === 0 || !isVisible) return null;
+
+  const currentNotification = notifications[currentIndex];
+
+  return (
+    <div className="fixed bottom-4 right-4 z-50 max-w-sm w-full">
+      <div 
+        className={`bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 transform transition-all duration-300 cursor-pointer hover:shadow-xl ${
+          isLeaving ? 'translate-y-full opacity-0' : 'translate-y-0 opacity-100'
+        }`}
+        onClick={() => handleNotificationClick(currentNotification)}
+      >
+        {/* Header with count indicator */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Bell className="w-4 h-4 text-blue-500" />
+            <span className="text-xs font-medium text-blue-500">
+              {currentIndex + 1} of {notifications.length} messages
+            </span>
+          </div>
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              handleClose();
+            }}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex items-start gap-3">
+          <Avatar className="h-10 w-10 rounded-full border-2 border-blue-100 dark:border-gray-700 overflow-hidden flex-shrink-0">
+            <AvatarImage
+              src={currentNotification.icon}
+              alt={currentNotification.userName}
+              className="object-cover h-full w-full"
+            />
+            <AvatarFallback className="bg-blue-100 dark:bg-gray-700 text-blue-600 dark:text-blue-300">
+              {currentNotification.userName.substring(0, 2).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between mb-1">
+              <h4 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                {currentNotification.userName}
+              </h4>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {currentNotification.time}
+              </span>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2">
+              {currentNotification.message}
+            </p>
+          </div>
+        </div>
+        
+        {/* Progress indicators */}
+        <div className="mt-3 flex gap-1">
+          {notifications.map((_, index) => (
+            <div 
+              key={index}
+              className={`h-1 flex-1 rounded-full transition-colors duration-200 ${
+                index === currentIndex 
+                  ? 'bg-blue-500' 
+                  : index < currentIndex 
+                    ? 'bg-blue-300' 
+                    : 'bg-gray-200 dark:bg-gray-700'
+              }`}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Individual Notification Popup Component (original)
 const NotificationPopup = ({ notification, onClose, onMessageClick }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
@@ -205,7 +326,8 @@ const Notification = () => {
   const [loading, setLoading] = useState(true);
   const [hasNewMessages, setHasNewMessages] = useState(false);
   const [imageCache, setImageCache] = useState({});
-  const [notification, setNotification] = useState(null); // Custom notification state
+  const [notification, setNotification] = useState(null); // Single notification state
+  const [allMessagesNotifications, setAllMessagesNotifications] = useState([]); // All messages notification state
   const [notificationQueue, setNotificationQueue] = useState([]); // Queue for multiple notifications
   const [notifiedMessages, setNotifiedMessages] = useState(new Set()); // Track already notified messages
   const prevMessageRef = useRef({});
@@ -251,6 +373,25 @@ const Notification = () => {
       } catch (error) {
         console.log('Error playing notification sound:', error);
       }
+    }
+  };
+
+  // Show all messages notification popup
+  const showAllMessagesNotification = (allMessages) => {
+    if (mountedRef.current && allMessages.length > 0) {
+      const notifications = allMessages.map(msg => {
+        const { time } = formatDate(parseJsonDate(msg.CREATED_ON));
+        return {
+          userName: msg.CREATED_USER,
+          message: msg.TASK_INFO || "You have a new message.",
+          icon: msg.createdEmpImage || DEFAULT_IMAGE,
+          time: time
+        };
+      });
+      
+      setAllMessagesNotifications(notifications);
+      playNotificationSound();
+      setHasNewMessages(true);
     }
   };
 
@@ -466,35 +607,39 @@ const Notification = () => {
         
         const allMessages = [...readyMessages, ...newMessages];
 
-        // Check for new messages and only notify for truly new ones
+        // Check for new messages and collect all of them for notification
         const newMessagesToNotify = [];
-        allMessages.forEach((msg) => {
+        const hasAnyNewMessages = allMessages.some((msg) => {
           const userKey = msg.CREATED_USER;
           const prev = prevMessageRef.current[userKey];
           const messageId = `${userKey}_${msg.TASK_INFO}_${msg.CREATED_ON}`;
           
-          // Only notify if this is a completely new message (different content or time)
-          // and we haven't already notified about it
-          if ((!prev || 
+          // Check if this is a new message
+          const isNewMessage = (!prev || 
                prev.TASK_INFO !== msg.TASK_INFO || 
                prev.CREATED_ON !== msg.CREATED_ON) && 
-              !notifiedMessages.has(messageId)) {
+              !notifiedMessages.has(messageId);
+
+          if (isNewMessage) {
             newMessagesToNotify.push(msg);
+            // Mark as notified
+            setNotifiedMessages(prev => new Set([...prev, messageId]));
+            return true;
           }
+          return false;
         });
 
-        // Add all new messages to notification queue
+        // Show all messages notification popup if there are new messages
         if (newMessagesToNotify.length > 0) {
-          newMessagesToNotify.forEach((msg) => {
-            if (timeoutRef.current) clearTimeout(timeoutRef.current);
-            timeoutRef.current = setTimeout(() => {
-              showCustomNotification(msg);
-            }, 300);
-          });
+          if (timeoutRef.current) clearTimeout(timeoutRef.current);
+          timeoutRef.current = setTimeout(() => {
+            // Show all messages notification instead of individual ones
+            showAllMessagesNotification(allMessages);
+          }, 300);
         }
 
         if (mountedRef.current) {
-          setHasNewMessages(newMessagesToNotify.length > 0);
+          setHasNewMessages(hasAnyNewMessages);
           prevMessageRef.current = Object.fromEntries(
             allMessages.map((msg) => [msg.CREATED_USER, msg])
           );
@@ -522,9 +667,19 @@ const Notification = () => {
     setNotification(null);
   };
 
+  // Handle all messages notification close
+  const handleAllMessagesNotificationClose = () => {
+    setAllMessagesNotifications([]);
+  };
+
   if (loading && groupedMessages.length === 0) {
     return (
       <>
+        <AllMessagesNotificationPopup 
+          notifications={allMessagesNotifications} 
+          onClose={handleAllMessagesNotificationClose}
+          onMessageClick={handleMessageClick}
+        />
         <NotificationPopup 
           notification={notification} 
           onClose={handleNotificationClose}
@@ -536,7 +691,14 @@ const Notification = () => {
 
   return (
     <>
-      {/* Custom Notification Popup */}
+      {/* All Messages Notification Popup */}
+      <AllMessagesNotificationPopup 
+        notifications={allMessagesNotifications} 
+        onClose={handleAllMessagesNotificationClose}
+        onMessageClick={handleMessageClick}
+      />
+      
+      {/* Individual Notification Popup (kept for backward compatibility) */}
       <NotificationPopup 
         notification={notification} 
         onClose={handleNotificationClose}
@@ -546,4 +708,4 @@ const Notification = () => {
   );
 };
 
-export default Notification; 
+export default Notification;

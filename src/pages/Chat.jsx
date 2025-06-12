@@ -692,9 +692,6 @@ const findActivePeerForUser = async (username) => {
     }
   };
 
-
-
-
 // 8. Enhanced endCall function
 const endCall = () => {
   console.log('Ending call...');
@@ -751,10 +748,6 @@ const endCall = () => {
   
   console.log('Call ended and cleaned up');
 };
-
-
-
-
 
   const toggleVideo = () => {
     if (localStream) {
@@ -990,6 +983,39 @@ const endCall = () => {
         return null;
     }
   };
+
+// Add audio-specific video element component
+const AudioVideoElement = ({ stream, muted = false, className = "" }) => {
+  const videoRef = useRef(null);
+  
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+      // Critical for audio calls - ensure video element plays audio
+      if (!muted) {
+        videoRef.current.muted = false;
+        videoRef.current.volume = 1.0;
+      }
+    }
+  }, [stream, muted]);
+
+  return (
+    <video
+      ref={videoRef}
+      autoPlay
+      playsInline
+      muted={muted}
+      className={className}
+      style={{ 
+        width: '100%', 
+        height: '100%',
+        objectFit: 'cover'
+      }}
+    />
+  );
+};
+
+// Updated CallModal component with proper audio handling
 const CallModal = () => {
   if (!showCallModal) return null;
 
@@ -999,11 +1025,10 @@ const CallModal = () => {
         isCallFullscreen ? 'w-full h-full' : 'w-96 max-w-lg'
       }`}>
         
-        {/* Incoming call UI with enhanced styling */}
+        {/* Incoming call UI */}
         {incomingCall && !isInCall && (
           <div className="p-8 text-center bg-gradient-to-br from-blue-500 to-purple-600 text-white rounded-lg">
             <div className="mb-6">
-              {/* Pulsing avatar for incoming call */}
               <div className="relative mx-auto w-32 h-32 mb-4">
                 <Avatar className="w-32 h-32 mx-auto border-4 border-white shadow-lg">
                   <AvatarImage src={selectedUserImage} />
@@ -1011,7 +1036,6 @@ const CallModal = () => {
                     {incomingCall.callerUsername?.charAt(0).toUpperCase() || 'U'}
                   </AvatarFallback>
                 </Avatar>
-                {/* Pulsing ring animation */}
                 <div className="absolute inset-0 rounded-full border-4 border-white opacity-30 animate-ping"></div>
                 <div className="absolute inset-0 rounded-full border-4 border-white opacity-20 animate-ping" style={{animationDelay: '0.5s'}}></div>
               </div>
@@ -1021,7 +1045,6 @@ const CallModal = () => {
               </h3>
               <p className="text-white/80 text-lg mb-2">Incoming call...</p>
               
-              {/* Ringing indicator */}
               <div className="flex justify-center items-center space-x-2">
                 <div className="flex space-x-1">
                   <div className="w-2 h-2 bg-white rounded-full animate-bounce"></div>
@@ -1031,7 +1054,6 @@ const CallModal = () => {
               </div>
             </div>
             
-            {/* Enhanced call action buttons */}
             <div className="flex justify-center space-x-8">
               <button
                 onClick={rejectCall}
@@ -1054,7 +1076,7 @@ const CallModal = () => {
         {/* Active call UI */}
         {isInCall && (
           <div className={`relative ${isCallFullscreen ? 'h-full' : 'h-96'}`}>
-            {/* Call header with enhanced status */}
+            {/* Call header */}
             <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/50 to-transparent z-10">
               <div className="flex justify-between items-center text-white">
                 <div>
@@ -1074,41 +1096,30 @@ const CallModal = () => {
                       <Maximize2 className="w-5 h-5" />
                     )}
                   </Button>
-                  {(callStatus === 'failed' || callStatus === 'offline' || callStatus === 'no-answer') && (
-                    <Button
-                      onClick={endCall}
-                      variant="ghost"
-                      size="icon"
-                      className="text-white hover:bg-white/10"
-                    >
-                      <X className="w-5 h-5" />
-                    </Button>
-                  )}
                 </div>
               </div>
             </div>
 
-            {/* Video streams */}
+            {/* Video streams with proper audio handling */}
             {callType === 'video' && (
               <div className="relative w-full h-full bg-gray-900">
-                <video
-                  ref={remoteVideoRef}
-                  autoPlay
-                  playsInline
+                {/* Remote video with audio */}
+                <AudioVideoElement 
+                  stream={remoteStream}
+                  muted={false}
                   className="w-full h-full object-cover"
                 />
                 
+                {/* Local video (muted to prevent echo) */}
                 <div className="absolute bottom-20 right-4 w-32 h-24 bg-gray-800 rounded-lg overflow-hidden">
-                  <video
-                    ref={localVideoRef}
-                    autoPlay
-                    playsInline
-                    muted
+                  <AudioVideoElement 
+                    stream={localStream}
+                    muted={true}
                     className="w-full h-full object-cover"
                   />
                 </div>
 
-                {/* Enhanced call status overlay */}
+                {/* Call status overlay */}
                 {callStatus !== 'connected' && (
                   <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                     <div className="text-center text-white">
@@ -1119,7 +1130,6 @@ const CallModal = () => {
                             {selectedUser?.charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
-                        {/* Show ringing animation during calling */}
                         {isRinging && (
                           <>
                             <div className="absolute inset-0 rounded-full border-4 border-white opacity-30 animate-ping"></div>
@@ -1134,30 +1144,40 @@ const CallModal = () => {
               </div>
             )}
 
-            {/* Enhanced audio call UI */}
+            {/* Audio call UI */}
             {callType === 'audio' && (
-              <div className="flex flex-col items-center justify-center h-full bg-gradient-to-br from-blue-500 to-purple-600 text-white">
-                <div className="relative mb-8">
-                  <Avatar className="w-40 h-40 border-4 border-white shadow-lg">
-                    <AvatarImage src={selectedUserImage} />
-                    <AvatarFallback className="bg-white/20 text-white text-5xl font-bold">
-                      {selectedUser?.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  {/* Ringing animation for audio calls */}
-                  {isRinging && (
-                    <>
-                      <div className="absolute inset-0 rounded-full border-4 border-white opacity-30 animate-ping"></div>
-                      <div className="absolute inset-0 rounded-full border-4 border-white opacity-20 animate-ping" style={{animationDelay: '0.5s'}}></div>
-                    </>
-                  )}
+              <div className="relative w-full h-full">
+                {/* Hidden audio element for audio-only calls */}
+                {remoteStream && (
+                  <AudioVideoElement 
+                    stream={remoteStream}
+                    muted={false}
+                    className="hidden"
+                  />
+                )}
+                
+                <div className="flex flex-col items-center justify-center h-full bg-gradient-to-br from-blue-500 to-purple-600 text-white">
+                  <div className="relative mb-8">
+                    <Avatar className="w-40 h-40 border-4 border-white shadow-lg">
+                      <AvatarImage src={selectedUserImage} />
+                      <AvatarFallback className="bg-white/20 text-white text-5xl font-bold">
+                        {selectedUser?.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    {isRinging && (
+                      <>
+                        <div className="absolute inset-0 rounded-full border-4 border-white opacity-30 animate-ping"></div>
+                        <div className="absolute inset-0 rounded-full border-4 border-white opacity-20 animate-ping" style={{animationDelay: '0.5s'}}></div>
+                      </>
+                    )}
+                  </div>
+                  <h3 className="text-3xl font-bold mb-4">{selectedUser}</h3>
+                  <CallStatusDisplay />
                 </div>
-                <h3 className="text-3xl font-bold mb-4">{selectedUser}</h3>
-                <CallStatusDisplay />
               </div>
             )}
 
-            {/* Enhanced call controls */}
+            {/* Call controls */}
             {(callStatus !== 'failed' && callStatus !== 'offline' && callStatus !== 'no-answer') && (
               <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/60 to-transparent">
                 <div className="flex justify-center space-x-6">
@@ -1225,7 +1245,6 @@ const CallModal = () => {
     </div>
   );
 };
-
   return (
     <div className="flex h-[75vh]  bg-[#f0f2f5] dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm">
       {/* Left sidebar - Contacts */}

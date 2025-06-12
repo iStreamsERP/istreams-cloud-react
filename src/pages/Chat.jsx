@@ -91,7 +91,10 @@ const Chat = () => {
   const [isRinging, setIsRinging] = useState(false);
   const [ringtone, setRingtone] = useState(null);
   const [callTimeout, setCallTimeout] = useState(null);
-
+// 1. Updated state management for better call type detection
+const [callMetadata, setCallMetadata] = useState(null); // Store call type info
+const [isInitiatingCall, setIsInitiatingCall] = useState(false);
+const [callHistory, setCallHistory] = useState([]);
   const chatEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const imageInputRef = useRef(null);
@@ -118,30 +121,37 @@ const Chat = () => {
       }
     };
   }, []);
-  const convertEmailToPeerId = (email) => {
-  // Convert email to a valid peer ID by replacing special characters
+
+
+  // Enhanced Call System with proper audio/video detection and UI fixes
+
+
+
+// 2. Enhanced convertEmailToPeerId with better validation
+const convertEmailToPeerId = (email) => {
+  if (!email) return null;
   return email.replace(/[@.]/g, '_').toLowerCase();
 };
 
-// 1. Fix the convertPeerIdToEmail function
 const convertPeerIdToEmail = (peerId) => {
-  // Convert peer ID back to email format - fix the logic
+  if (!peerId || !peerId.includes('_')) return peerId + '@demo.com';
   const parts = peerId.split('_');
   if (parts.length >= 2) {
     return parts[0] + '@' + parts.slice(1).join('.');
   }
-  return peerId + '@demo.com'; // fallback
+  return peerId + '@demo.com';
 };
 
-// 2. Update the startCall function - replace the existing one
+// 3. Enhanced startCall function with proper call type handling
 const startCall = async (type) => {
-  if (!peer || !selectedUser) {
+  if (!peer || !selectedUser || isInitiatingCall) {
     setCallError('Connection not ready. Please try again.');
     setShowCallError(true);
     return;
   }
 
   try {
+    setIsInitiatingCall(true);
     setCallType(type);
     setIsInCall(true);
     setShowCallModal(true);
@@ -149,17 +159,21 @@ const startCall = async (type) => {
     setCallError(null);
     setIsRinging(true);
 
+    console.log(`Starting ${type} call to:`, selectedUser);
+
     // Start playing ringtone for outgoing call
     if (ringtone) {
       ringtone.currentTime = 0;
       ringtone.play().catch(console.error);
     }
 
+    // Get media with proper constraints based on call type
     const constraints = {
       video: type === 'video',
       audio: true
     };
 
+    console.log('Getting user media with constraints:', constraints);
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     setLocalStream(stream);
 
@@ -167,16 +181,33 @@ const startCall = async (type) => {
       localVideoRef.current.srcObject = stream;
     }
 
-    // Fix: Use proper email format for recipient
+    // Create call metadata to send call type info
+    const callMetadata = {
+      type: type,
+      timestamp: Date.now(),
+      caller: userData.userName
+    };
+
+    // Store metadata for this call
+    setCallMetadata(callMetadata);
+
     const recipientEmail = selectedUser.toLowerCase() + '@demo.com';
     const recipientPeerId = convertEmailToPeerId(recipientEmail);
-    console.log('Calling user:', selectedUser);
-    console.log('Recipient email:', recipientEmail);
-    console.log('Recipient peer ID:', recipientPeerId);
-    console.log('My peer ID:', peer.id);
+    
+    console.log('Call details:', {
+      selectedUser,
+      recipientEmail,
+      recipientPeerId,
+      myPeerId: peer.id,
+      callType: type
+    });
     
     setCallStatus('connecting');
-    const call = peer.call(recipientPeerId, stream);
+    
+    // Create the call with metadata
+    const call = peer.call(recipientPeerId, stream, {
+      metadata: callMetadata // Pass call type info
+    });
     
     if (!call) {
       throw new Error('Failed to initiate call');
@@ -184,105 +215,485 @@ const startCall = async (type) => {
     
     setCurrentCall(call);
 
-    // Enhanced timeout with ringing detection
+    // Enhanced timeout handling
     const timeout = setTimeout(() => {
       if (!isCallConnected) {
         console.log('Call timeout - recipient not available');
-        setIsRinging(false);
-        if (ringtone) {
-          ringtone.pause();
-          ringtone.currentTime = 0;
-        }
-        
-        setCallStatus('no-answer');
-        setCallError(`${selectedUser} didn't answer the call.`);
-        setShowCallError(true);
-        endCall();
+        handleCallTimeout();
       }
-    }, 30000); // 30 seconds timeout
+    }, 30000);
 
     setCallTimeout(timeout);
 
+    // Handle remote stream
     call.on('stream', (remoteStream) => {
       console.log('Received remote stream');
-      clearTimeout(timeout);
-      setIsRinging(false);
-      if (ringtone) {
-        ringtone.pause();
-        ringtone.currentTime = 0;
-      }
-      
-      setRemoteStream(remoteStream);
-      setIsCallConnected(true);
-      setCallStatus('connected');
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = remoteStream;
-      }
-      
-      // Start call duration timer
-      setCallDuration(0);
+      handleRemoteStreamReceived(remoteStream);
     });
 
+    // Handle call close
     call.on('close', () => {
       console.log('Call closed by remote peer');
-      clearTimeout(timeout);
-      setIsRinging(false);
-      if (ringtone) {
-        ringtone.pause();
-        ringtone.currentTime = 0;
-      }
-      setCallStatus('ended');
-      endCall();
+      handleCallClosed();
     });
 
+    // Enhanced error handling
     call.on('error', (error) => {
       console.error('Call error:', error);
-      clearTimeout(timeout);
-      setIsRinging(false);
-      if (ringtone) {
-        ringtone.pause();
-        ringtone.currentTime = 0;
-      }
-      setCallStatus('failed');
-      
-      let errorMessage = 'Failed to connect call. Please try again.';
-      if (error.type === 'peer-unavailable') {
-        errorMessage = `${selectedUser} is currently offline or unavailable.`;
-        setCallStatus('offline');
-      } else if (error.type === 'network') {
-        errorMessage = 'Network connection issue. Please check your internet connection.';
-      } else if (error.type === 'disconnected') {
-        errorMessage = 'Connection lost. Please try calling again.';
-      }
-      
-      setCallError(errorMessage);
-      setShowCallError(true);
-      endCall();
+      handleCallError(error);
     });
 
   } catch (error) {
     console.error('Error starting call:', error);
-    setIsRinging(false);
+    handleCallInitError(error);
+  } finally {
+    setIsInitiatingCall(false);
+  }
+};
+
+
+
+// 5. Enhanced answerCall function with proper media constraints
+const answerCall = async () => {
+  if (!incomingCall) return;
+
+  try {
+    console.log(`Answering ${incomingCallType} call`);
+    
+    // Stop ringtone
     if (ringtone) {
       ringtone.pause();
       ringtone.currentTime = 0;
     }
-    setCallStatus('failed');
     
-    let errorMessage = 'Failed to start call. Please try again.';
-    if (error.name === 'NotAllowedError') {
-      errorMessage = 'Camera/microphone access denied. Please allow access in your browser settings and try again.';
-    } else if (error.name === 'NotFoundError') {
-      errorMessage = 'Camera/microphone not found. Please check your devices and try again.';
-    } else if (error.name === 'NotReadableError') {
-      errorMessage = 'Camera/microphone is being used by another application. Please close other apps and try again.';
+    // Clear auto-reject timeout
+    if (incomingCall.autoRejectTimeout) {
+      clearTimeout(incomingCall.autoRejectTimeout);
     }
+
+    // Get media with proper constraints based on call type
+    const constraints = {
+      video: incomingCallType === 'video',
+      audio: true
+    };
+
+    console.log('Answering with constraints:', constraints);
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    setLocalStream(stream);
+    setCallType(incomingCallType);
+    setIsInCall(true);
+    setCallStatus('connecting');
+
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = stream;
+    }
+
+    // Answer the call with our stream
+    incomingCall.answer(stream);
+    setCurrentCall(incomingCall);
+
+    // Handle remote stream
+    incomingCall.on('stream', (remoteStream) => {
+      console.log('Received remote stream in answer');
+      handleRemoteStreamReceived(remoteStream);
+    });
+
+    incomingCall.on('close', () => {
+      console.log('Answered call closed');
+      handleCallClosed();
+    });
+
+    incomingCall.on('error', (error) => {
+      console.error('Answer call error:', error);
+      handleCallError(error);
+    });
+
+    setIncomingCall(null);
+    setIncomingCallType(null);
     
-    setCallError(errorMessage);
-    setShowCallError(true);
-    endCall();
+  } catch (error) {
+    console.error('Error answering call:', error);
+    handleCallInitError(error);
+    rejectCall();
   }
 };
+
+// 6. Helper functions for better error handling
+const handleCallTimeout = () => {
+  setIsRinging(false);
+  if (ringtone) {
+    ringtone.pause();
+    ringtone.currentTime = 0;
+  }
+  
+  setCallStatus('no-answer');
+  setCallError(`${selectedUser} didn't answer the call.`);
+  setShowCallError(true);
+  endCall();
+};
+
+const handleRemoteStreamReceived = (remoteStream) => {
+  console.log('Remote stream received, setting up...');
+  
+  if (callTimeout) {
+    clearTimeout(callTimeout);
+    setCallTimeout(null);
+  }
+  
+  setIsRinging(false);
+  if (ringtone) {
+    ringtone.pause();
+    ringtone.currentTime = 0;
+  }
+  
+  setRemoteStream(remoteStream);
+  setIsCallConnected(true);
+  setCallStatus('connected');
+  
+  if (remoteVideoRef.current) {
+    remoteVideoRef.current.srcObject = remoteStream;
+  }
+  
+  // Start call duration timer
+  setCallDuration(0);
+  
+  // Log call in history
+  const callRecord = {
+    id: Date.now(),
+    user: selectedUser || incomingCall?.callerUsername,
+    type: callType,
+    duration: 0,
+    timestamp: new Date(),
+    status: 'connected'
+  };
+  setCallHistory(prev => [callRecord, ...prev]);
+};
+
+const handleCallClosed = () => {
+  console.log('Call closed, cleaning up...');
+  if (callTimeout) {
+    clearTimeout(callTimeout);
+    setCallTimeout(null);
+  }
+  setIsRinging(false);
+  if (ringtone) {
+    ringtone.pause();
+    ringtone.currentTime = 0;
+  }
+  setCallStatus('ended');
+  endCall();
+};
+
+const handleCallError = (error) => {
+  if (callTimeout) {
+    clearTimeout(callTimeout);
+    setCallTimeout(null);
+  }
+  setIsRinging(false);
+  if (ringtone) {
+    ringtone.pause();
+    ringtone.currentTime = 0;
+  }
+  setCallStatus('failed');
+  
+  let errorMessage = 'Failed to connect call. Please try again.';
+  
+  switch (error.type) {
+    case 'peer-unavailable':
+      errorMessage = `${selectedUser} is currently offline or unavailable.`;
+      setCallStatus('offline');
+      break;
+    case 'network':
+      errorMessage = 'Network connection issue. Please check your internet connection.';
+      break;
+    case 'disconnected':
+      errorMessage = 'Connection lost. Please try calling again.';
+      break;
+    case 'call-rejected':
+      errorMessage = `${selectedUser} declined the call.`;
+      break;
+    default:
+      if (error.message) {
+        errorMessage = error.message;
+      }
+  }
+  
+  setCallError(errorMessage);
+  setShowCallError(true);
+  endCall();
+};
+
+const handleCallInitError = (error) => {
+  setIsRinging(false);
+  if (ringtone) {
+    ringtone.pause();
+    ringtone.currentTime = 0;
+  }
+  setCallStatus('failed');
+  
+  let errorMessage = 'Failed to start call. Please try again.';
+  
+  switch (error.name) {
+    case 'NotAllowedError':
+      errorMessage = 'Camera/microphone access denied. Please allow access in your browser settings and try again.';
+      break;
+    case 'NotFoundError':
+      errorMessage = 'Camera/microphone not found. Please check your devices and try again.';
+      break;
+    case 'NotReadableError':
+      errorMessage = 'Camera/microphone is being used by another application. Please close other apps and try again.';
+      break;
+    case 'OverconstrainedError':
+      errorMessage = 'Your device does not support the required video/audio format.';
+      break;
+    default:
+      if (error.message) {
+        errorMessage = error.message;
+      }
+  }
+  
+  setCallError(errorMessage);
+  setShowCallError(true);
+  endCall();
+};
+
+// 7. Enhanced rejectCall function
+const rejectCall = () => {
+  console.log('Rejecting call');
+  
+  if (ringtone) {
+    ringtone.pause();
+    ringtone.currentTime = 0;
+  }
+  
+  if (incomingCall) {
+    // Clear auto-reject timeout
+    if (incomingCall.autoRejectTimeout) {
+      clearTimeout(incomingCall.autoRejectTimeout);
+    }
+    
+    // Send rejection signal
+    try {
+      incomingCall.close();
+    } catch (error) {
+      console.error('Error closing incoming call:', error);
+    }
+    setIncomingCall(null);
+  }
+  
+  setIncomingCallType(null);
+  setShowCallModal(false);
+  setCallStatus('');
+  setCallType(null);
+};
+
+// 8. Enhanced endCall function with better cleanup
+const endCall = () => {
+  console.log('Ending call - comprehensive cleanup');
+  
+  // Stop ringtone
+  setIsRinging(false);
+  if (ringtone) {
+    ringtone.pause();
+    ringtone.currentTime = 0;
+  }
+  
+  // Clear all timeouts
+  if (callTimeout) {
+    clearTimeout(callTimeout);
+    setCallTimeout(null);
+  }
+  
+  // Close current call
+  if (currentCall) {
+    try {
+      currentCall.close();
+    } catch (error) {
+      console.error('Error closing current call:', error);
+    }
+  }
+
+  // Stop all media streams
+  if (localStream) {
+    localStream.getTracks().forEach(track => {
+      track.stop();
+      console.log('Stopped local track:', track.kind);
+    });
+  }
+
+  if (remoteStream) {
+    remoteStream.getTracks().forEach(track => {
+      track.stop();
+      console.log('Stopped remote track:', track.kind);
+    });
+  }
+
+  // Clear video elements
+  if (localVideoRef.current) {
+    localVideoRef.current.srcObject = null;
+  }
+  if (remoteVideoRef.current) {
+    remoteVideoRef.current.srcObject = null;
+  }
+
+  // Reset all call-related states
+  setLocalStream(null);
+  setRemoteStream(null);
+  setCurrentCall(null);
+  setIsInCall(false);
+  setIsCallConnected(false);
+  setShowCallModal(false);
+  setCallType(null);
+  setIncomingCallType(null);
+  setCallDuration(0);
+  setCallStatus('');
+  setIsScreenSharing(false);
+  setIsCallFullscreen(false);
+  setIsVideoEnabled(true);
+  setIsAudioEnabled(true);
+  setCallMetadata(null);
+  setIsInitiatingCall(false);
+  
+  console.log('Call ended and cleaned up completely');
+};
+
+// 9. Enhanced peer initialization with better error handling
+const initializePeer = () => {
+  if (!userData?.userEmail) {
+    console.error('User email not available for peer initialization');
+    return;
+  }
+  
+  const peerId = convertEmailToPeerId(userData.userEmail.toLowerCase());
+  console.log('Initializing peer:', { userEmail: userData.userEmail, peerId });
+  
+  // Destroy existing peer
+  if (peer && !peer.destroyed) {
+    peer.destroy();
+  }
+  
+  const peerInstance = new window.Peer(peerId, {
+    host: '0.peerjs.com',
+    port: 443,
+    path: '/',
+    secure: true,
+    debug: 1, // Reduced debug level for cleaner logs
+    config: {
+      'iceServers': [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:global.stun.twilio.com:3478' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
+    }
+  });
+
+  peerInstance.on('open', (id) => {
+    console.log('✅ Peer connected successfully with ID:', id);
+    setPeer(peerInstance);
+  });
+
+  peerInstance.on('call', handleIncomingCall);
+
+  peerInstance.on('error', (error) => {
+    console.error('❌ Peer error:', error);
+    
+    if (error.type === 'peer-destroyed') {
+      console.log('🔄 Peer destroyed, reconnecting...');
+      setTimeout(() => {
+        initializePeer();
+      }, 2000);
+    } else {
+      let errorMessage = 'Connection error. Please refresh and try again.';
+      if (error.type === 'unavailable-id') {
+        errorMessage = 'Your session has expired. Please refresh the page.';
+      }
+      setCallError(errorMessage);
+      setShowCallError(true);
+    }
+  });
+
+  peerInstance.on('disconnected', () => {
+    console.log('⚠️ Peer disconnected, attempting to reconnect...');
+    setTimeout(() => {
+      if (!peerInstance.destroyed) {
+        peerInstance.reconnect();
+      }
+    }, 1000);
+  });
+
+  peerInstance.on('connection', (conn) => {
+    console.log('🔗 Data connection established with:', conn.peer);
+  });
+};
+
+// 10. Enhanced UI components with proper call type display
+
+// Enhanced CallStatusDisplay with better status messages
+const CallStatusDisplay = () => {
+  const getStatusText = () => {
+    switch (callStatus) {
+      case 'calling':
+        return isRinging && !isCallConnected ? `Ringing ${selectedUser}...` : `Calling ${selectedUser}...`;
+      case 'connecting':
+        return 'Connecting...';
+      case 'connected':
+        return formatCallDuration(callDuration);
+      case 'failed':
+        return 'Call failed';
+      case 'ended':
+        return 'Call ended';
+      case 'offline':
+        return 'User offline';
+      case 'no-answer':
+        return 'No answer';
+      case 'incoming':
+        return `Incoming ${incomingCallType || callType} call...`;
+      default:
+        return '';
+    }
+  };
+
+  const getStatusColor = () => {
+    switch (callStatus) {
+      case 'calling':
+      case 'connecting':
+      case 'incoming':
+        return 'text-blue-400';
+      case 'connected':
+        return 'text-green-400';
+      case 'failed':
+      case 'offline':
+      case 'no-answer':
+        return 'text-red-400';
+      case 'ended':
+        return 'text-gray-400';
+      default:
+        return 'text-gray-400';
+    }
+  };
+
+  return (
+    <div className="text-center">
+      <p className={`text-sm ${getStatusColor()}`}>
+        {getStatusText()}
+      </p>
+      {(callStatus === 'calling' || callStatus === 'connecting' || callStatus === 'incoming') && (
+        <div className="flex justify-center mt-2">
+          {isRinging || callStatus === 'incoming' ? (
+            <div className="flex space-x-1">
+              <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
+              <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+              <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+            </div>
+          ) : (
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-400"></div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 
 // Add these state variables to track call type detection
 const [incomingCallType, setIncomingCallType] = useState(null); // 'audio' or 'video'
@@ -335,202 +746,7 @@ const handleIncomingCall = (call) => {
 };
 
 // 4. Fixed answerCall function 
-const answerCall = async () => {
-  if (!incomingCall) return;
 
-  try {
-    // Stop ringtone
-    if (ringtone) {
-      ringtone.pause();
-      ringtone.currentTime = 0;
-    }
-
-    const constraints = {
-      video: true,
-      audio: true
-    };
-
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    setLocalStream(stream);
-    setCallType('video');
-    setIsInCall(true);
-    setCallStatus('connecting');
-
-    if (localVideoRef.current) {
-      localVideoRef.current.srcObject = stream;
-    }
-
-    // Answer the call with our stream - incomingCall is the actual call object
-    incomingCall.answer(stream);
-    setCurrentCall(incomingCall);
-
-    incomingCall.on('stream', (remoteStream) => {
-      console.log('Received remote stream in answer');
-      setRemoteStream(remoteStream);
-      setIsCallConnected(true);
-      setCallStatus('connected');
-      setCallDuration(0); // Start duration counter
-      
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = remoteStream;
-      }
-    });
-
-    incomingCall.on('close', () => {
-      console.log('Incoming call closed');
-      endCall();
-    });
-
-    incomingCall.on('error', (error) => {
-      console.error('Answer call error:', error);
-      setCallError('Failed to establish connection.');
-      setShowCallError(true);
-      endCall();
-    });
-
-    setIncomingCall(null);
-  } catch (error) {
-    console.error('Error answering call:', error);
-    setCallError('Failed to answer call. Please check your camera/microphone permissions.');
-    setShowCallError(true);
-    rejectCall();
-  }  
-};
-
-
-// 5. Add better peer initialization with debug logging
-const initializePeer = () => {
-  const peerId = convertEmailToPeerId(userData.userEmail.toLowerCase());
-  console.log('User email:', userData.userEmail);
-  console.log('Creating peer with ID:', peerId);
-  
-  if (peer) {
-    peer.destroy();
-  }
-  
-  const peerInstance = new window.Peer(peerId, {
-    host: '0.peerjs.com',
-    port: 443,
-    path: '/',
-    secure: true,
-    debug: 2, // Increase debug level
-    config: {
-      'iceServers': [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:global.stun.twilio.com:3478' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-      ]
-    }
-  });
-
-  peerInstance.on('open', (id) => {
-    console.log('Peer connected successfully with ID:', id);
-    console.log('Ready to make/receive calls');
-    setPeer(peerInstance);
-  });
-
-  peerInstance.on('call', handleIncomingCall);
-
-  peerInstance.on('error', (error) => {
-    console.error('Peer error:', error);
-    
-    let errorMessage = 'Connection error. Please refresh and try again.';
-    if (error.type === 'peer-unavailable') {
-      errorMessage = 'User is currently unavailable.';
-    } else if (error.type === 'network') {
-      errorMessage = 'Network connection problem.';
-    } else if (error.type === 'peer-destroyed') {
-      errorMessage = 'Connection was destroyed. Reconnecting...';
-      // Auto-reconnect after a delay
-      setTimeout(() => {
-        initializePeer();
-      }, 2000);
-      return;
-    }
-    
-    setCallError(errorMessage);
-    setShowCallError(true);
-  });
-
-  peerInstance.on('disconnected', () => {
-    console.log('Peer disconnected, attempting to reconnect...');
-    setTimeout(() => {
-      if (!peerInstance.destroyed) {
-        peerInstance.reconnect();
-      }
-    }, 1000);
-  });
-
-  peerInstance.on('connection', (conn) => {
-    console.log('Data connection established with:', conn.peer);
-  });
-};
-
-// 3. Update the handleIncomingCall function
-
-// Enhanced Call Status Display Component
-const CallStatusDisplay = () => {
-  const getStatusText = () => {
-    switch (callStatus) {
-      case 'calling':
-        return isRinging && !isCallConnected ? `Ringing ${selectedUser}...` : `Calling ${selectedUser}...`;
-      case 'connecting':
-        return 'Connecting...';
-      case 'connected':
-        return formatCallDuration(callDuration);
-      case 'failed':
-        return 'Call failed';
-      case 'ended':
-        return 'Call ended';
-      case 'offline':
-        return 'User offline';
-      case 'no-answer':
-        return 'No answer';
-      default:
-        return '';
-    }
-  };
-
-  const getStatusColor = () => {
-    switch (callStatus) {
-      case 'calling':
-      case 'connecting':
-        return 'text-blue-400';
-      case 'connected':
-        return 'text-green-400';
-      case 'failed':
-      case 'offline':
-      case 'no-answer':
-        return 'text-red-400';
-      case 'ended':
-        return 'text-gray-400';
-      default:
-        return 'text-gray-400';
-    }
-  };
-
-  return (
-    <div className="text-center">
-      <p className={`text-sm ${getStatusColor()}`}>
-        {getStatusText()}
-      </p>
-      {(callStatus === 'calling' || callStatus === 'connecting') && (
-        <div className="flex justify-center mt-2">
-          {isRinging ? (
-            // Ringing animation
-            <div className="flex space-x-1">
-              <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
-              <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-              <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-            </div>
-          ) : (
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-400"></div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
 // Call Error Modal Component
 const CallErrorModal = () => {
   if (!showCallError || !callError) return null;
@@ -692,79 +908,6 @@ const findActivePeerForUser = async (username) => {
     }
   };
 
-const rejectCall = () => {
-  if (ringtone) {
-    ringtone.pause();
-    ringtone.currentTime = 0;
-  }
-  
-  if (incomingCall) {
-    incomingCall.close();
-    setIncomingCall(null);
-  }
-  
-  setIncomingCallType(null);
-  setShowCallModal(false);
-  setCallStatus('');
-};
-
-// Enhanced endCall function to reset call type
-const endCall = () => {
-  console.log('Ending call...');
-  
-  // Stop ringtone
-  setIsRinging(false);
-  if (ringtone) {
-    ringtone.pause();
-    ringtone.currentTime = 0;
-  }
-  
-  // Clear timeout
-  if (callTimeout) {
-    clearTimeout(callTimeout);
-    setCallTimeout(null);
-  }
-  
-  if (currentCall) {
-    currentCall.close();
-  }
-
-  if (localStream) {
-    localStream.getTracks().forEach(track => {
-      track.stop();
-      console.log('Stopped track:', track.kind);
-    });
-  }
-
-  if (remoteStream) {
-    remoteStream.getTracks().forEach(track => track.stop());
-  }
-
-  if (localVideoRef.current) {
-    localVideoRef.current.srcObject = null;
-  }
-  if (remoteVideoRef.current) {
-    remoteVideoRef.current.srcObject = null;
-  }
-
-  // Reset all call-related states
-  setLocalStream(null);
-  setRemoteStream(null);
-  setCurrentCall(null);
-  setIsInCall(false);
-  setIsCallConnected(false);
-  setShowCallModal(false);
-  setCallType(null);
-  setIncomingCallType(null); // Reset incoming call type
-  setCallDuration(0);
-  setCallStatus('');
-  setIsScreenSharing(false);
-  setIsCallFullscreen(false);
-  setIsVideoEnabled(true);
-  setIsAudioEnabled(true);
-  
-  console.log('Call ended and cleaned up');
-};
   const toggleVideo = () => {
     if (localStream) {
       const videoTrack = localStream.getVideoTracks()[0];
@@ -1000,20 +1143,21 @@ const endCall = () => {
     }
   };
 
-// Add audio-specific video element component
-const AudioVideoElement = ({ stream, muted = false, className = "" }) => {
+const AudioVideoElement = ({ stream, muted = false, className = "", isAudioOnly = false }) => {
   const videoRef = useRef(null);
   
   useEffect(() => {
     if (videoRef.current && stream) {
       videoRef.current.srcObject = stream;
-      // Critical for audio calls - ensure video element plays audio
-      if (!muted) {
-        videoRef.current.muted = false;
+      videoRef.current.muted = muted;
+      
+      // For audio-only calls, ensure audio plays
+      if (isAudioOnly && !muted) {
         videoRef.current.volume = 1.0;
+        videoRef.current.play().catch(console.error);
       }
     }
-  }, [stream, muted]);
+  }, [stream, muted, isAudioOnly]);
 
   return (
     <video
@@ -1021,7 +1165,7 @@ const AudioVideoElement = ({ stream, muted = false, className = "" }) => {
       autoPlay
       playsInline
       muted={muted}
-      className={className}
+      className={`${className} ${isAudioOnly ? 'hidden' : ''}`}
       style={{ 
         width: '100%', 
         height: '100%',
@@ -1034,7 +1178,19 @@ const AudioVideoElement = ({ stream, muted = false, className = "" }) => {
 // Updated CallModal component with proper audio handling
 const CallModal = () => {
   if (!showCallModal) return null;
+const getCallTypeIcon = (type) => {
+    return type === 'audio' ? Phone : VideoIcon;
+  };
 
+  const getCallTypeLabel = (type) => {
+    return type === 'audio' ? 'Audio Call' : 'Video Call';
+  };
+
+  const getGradientClass = (type) => {
+    return type === 'audio' 
+      ? 'from-green-500 to-blue-600' 
+      : 'from-blue-500 to-purple-600';
+  };
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
       <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl ${
@@ -1097,13 +1253,14 @@ const CallModal = () => {
           </div>
         )}
 
-        {/* Incoming Video Call UI */}
-        {incomingCall && !isInCall && incomingCallType === 'video' && (
-          <div className="p-8 text-center bg-gradient-to-br from-blue-500 to-purple-600 text-white rounded-lg">
+          {incomingCall && !isInCall && (
+          <div className={`p-8 text-center bg-gradient-to-br ${getGradientClass(incomingCallType)} text-white rounded-lg`}>
             <div className="mb-6">
-              {/* Video call icon */}
+              {/* Dynamic call type icon */}
               <div className="relative mx-auto w-24 h-24 mb-6 bg-white/20 rounded-full flex items-center justify-center">
-                <VideoIcon className="w-12 h-12 text-white animate-pulse" />
+                {React.createElement(getCallTypeIcon(incomingCallType), {
+                  className: "w-12 h-12 text-white animate-pulse"
+                })}
                 <div className="absolute inset-0 rounded-full border-4 border-white opacity-30 animate-ping"></div>
                 <div className="absolute inset-0 rounded-full border-4 border-white opacity-20 animate-ping" style={{animationDelay: '0.5s'}}></div>
               </div>
@@ -1121,33 +1278,48 @@ const CallModal = () => {
                 {incomingCall.callerUsername || 'Unknown User'}
               </h3>
               <p className="text-white/80 text-lg mb-2 flex items-center justify-center">
-                <VideoIcon className="w-5 h-5 mr-2" />
-                Incoming video call...
+                {React.createElement(getCallTypeIcon(incomingCallType), {
+                  className: "w-5 h-5 mr-2"
+                })}
+                Incoming {getCallTypeLabel(incomingCallType).toLowerCase()}...
               </p>
               
-              <div className="flex justify-center items-center space-x-2">
+              {/* Enhanced status display */}
+              <div className="flex justify-center items-center space-x-2 mb-4">
                 <div className="flex space-x-1">
                   <div className="w-2 h-2 bg-white rounded-full animate-bounce"></div>
                   <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
                   <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
                 </div>
               </div>
+              
+              {/* Call type specific info */}
+              <div className="text-white/60 text-sm mb-4">
+                {incomingCallType === 'audio' ? (
+                  <span>🎧 High quality audio call</span>
+                ) : (
+                  <span>📹 HD video call with audio</span>
+                )}
+              </div>
             </div>
             
+            {/* Action buttons */}
             <div className="flex justify-center space-x-8">
               <button
                 onClick={rejectCall}
                 className="bg-red-500 hover:bg-red-600 text-white rounded-full p-6 shadow-lg transform hover:scale-105 transition-all duration-200"
-                title="Decline video call"
+                title={`Decline ${incomingCallType} call`}
               >
                 <PhoneOff className="w-8 h-8" />
               </button>
               <button
                 onClick={answerCall}
                 className="bg-green-500 hover:bg-green-600 text-white rounded-full p-6 shadow-lg transform hover:scale-105 transition-all duration-200 animate-pulse"
-                title="Answer video call"
+                title={`Answer ${incomingCallType} call`}
               >
-                <VideoIcon className="w-8 h-8" />
+                {React.createElement(getCallTypeIcon(incomingCallType), {
+                  className: "w-8 h-8"
+                })}
               </button>
             </div>
           </div>

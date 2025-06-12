@@ -284,7 +284,10 @@ const startCall = async (type) => {
   }
 };
 
-// 3. Update the handleIncomingCall function - DON'T spread the call object
+// Add these state variables to track call type detection
+const [incomingCallType, setIncomingCallType] = useState(null); // 'audio' or 'video'
+
+// Enhanced handleIncomingCall function to detect call type
 const handleIncomingCall = (call) => {
   console.log('Incoming call from peer:', call.peer);
   console.log('Converting peer ID to email:', call.peer);
@@ -306,7 +309,19 @@ const handleIncomingCall = (call) => {
   );
   const callerName = callerUser ? callerUser.user_name : callerUsername;
   
-  // DON'T spread the call object - keep it intact and add username separately
+  // Detect call type by checking if caller has video stream
+  // This is a bit tricky with PeerJS, so we'll use a different approach
+  // We'll assume video call initially and update based on stream
+  setIncomingCallType('video'); // Default to video, will be updated when stream is received
+  
+  // Set up stream detection
+  call.on('stream', (remoteStream) => {
+    const videoTracks = remoteStream.getVideoTracks();
+    const detectedCallType = videoTracks.length > 0 ? 'video' : 'audio';
+    setIncomingCallType(detectedCallType);
+    console.log('Detected call type:', detectedCallType);
+  });
+  
   call.callerUsername = callerName;
   setIncomingCall(call);
   setShowCallModal(true);
@@ -382,21 +397,6 @@ const answerCall = async () => {
   }  
 };
 
-// 5. Fixed rejectCall function
-const rejectCall = () => {
-  if (ringtone) {
-    ringtone.pause();
-    ringtone.currentTime = 0;
-  }
-  
-  if (incomingCall) {
-    // Use the correct method to close the call
-    incomingCall.close();
-    setIncomingCall(null);
-  }
-  setShowCallModal(false);
-  setCallStatus('');
-};
 
 // 5. Add better peer initialization with debug logging
 const initializePeer = () => {
@@ -692,7 +692,23 @@ const findActivePeerForUser = async (username) => {
     }
   };
 
-// 8. Enhanced endCall function
+const rejectCall = () => {
+  if (ringtone) {
+    ringtone.pause();
+    ringtone.currentTime = 0;
+  }
+  
+  if (incomingCall) {
+    incomingCall.close();
+    setIncomingCall(null);
+  }
+  
+  setIncomingCallType(null);
+  setShowCallModal(false);
+  setCallStatus('');
+};
+
+// Enhanced endCall function to reset call type
 const endCall = () => {
   console.log('Ending call...');
   
@@ -739,6 +755,7 @@ const endCall = () => {
   setIsCallConnected(false);
   setShowCallModal(false);
   setCallType(null);
+  setIncomingCallType(null); // Reset incoming call type
   setCallDuration(0);
   setCallStatus('');
   setIsScreenSharing(false);
@@ -748,7 +765,6 @@ const endCall = () => {
   
   console.log('Call ended and cleaned up');
 };
-
   const toggleVideo = () => {
     if (localStream) {
       const videoTrack = localStream.getVideoTracks()[0];
@@ -1025,10 +1041,17 @@ const CallModal = () => {
         isCallFullscreen ? 'w-full h-full' : 'w-96 max-w-lg'
       }`}>
         
-        {/* Incoming call UI */}
-        {incomingCall && !isInCall && (
-          <div className="p-8 text-center bg-gradient-to-br from-blue-500 to-purple-600 text-white rounded-lg">
+        {/* Incoming Audio Call UI */}
+        {incomingCall && !isInCall && incomingCallType === 'audio' && (
+          <div className="p-8 text-center bg-gradient-to-br from-green-500 to-blue-600 text-white rounded-lg">
             <div className="mb-6">
+              {/* Audio call icon */}
+              <div className="relative mx-auto w-24 h-24 mb-6 bg-white/20 rounded-full flex items-center justify-center">
+                <Phone className="w-12 h-12 text-white animate-pulse" />
+                <div className="absolute inset-0 rounded-full border-4 border-white opacity-30 animate-ping"></div>
+                <div className="absolute inset-0 rounded-full border-4 border-white opacity-20 animate-ping" style={{animationDelay: '0.5s'}}></div>
+              </div>
+              
               <div className="relative mx-auto w-32 h-32 mb-4">
                 <Avatar className="w-32 h-32 mx-auto border-4 border-white shadow-lg">
                   <AvatarImage src={selectedUserImage} />
@@ -1036,14 +1059,15 @@ const CallModal = () => {
                     {incomingCall.callerUsername?.charAt(0).toUpperCase() || 'U'}
                   </AvatarFallback>
                 </Avatar>
-                <div className="absolute inset-0 rounded-full border-4 border-white opacity-30 animate-ping"></div>
-                <div className="absolute inset-0 rounded-full border-4 border-white opacity-20 animate-ping" style={{animationDelay: '0.5s'}}></div>
               </div>
               
               <h3 className="text-2xl font-bold mb-2">
                 {incomingCall.callerUsername || 'Unknown User'}
               </h3>
-              <p className="text-white/80 text-lg mb-2">Incoming call...</p>
+              <p className="text-white/80 text-lg mb-2 flex items-center justify-center">
+                <Phone className="w-5 h-5 mr-2" />
+                Incoming audio call...
+              </p>
               
               <div className="flex justify-center items-center space-x-2">
                 <div className="flex space-x-1">
@@ -1058,14 +1082,14 @@ const CallModal = () => {
               <button
                 onClick={rejectCall}
                 className="bg-red-500 hover:bg-red-600 text-white rounded-full p-6 shadow-lg transform hover:scale-105 transition-all duration-200"
-                title="Decline call"
+                title="Decline audio call"
               >
                 <PhoneOff className="w-8 h-8" />
               </button>
               <button
                 onClick={answerCall}
                 className="bg-green-500 hover:bg-green-600 text-white rounded-full p-6 shadow-lg transform hover:scale-105 transition-all duration-200 animate-pulse"
-                title="Answer call"
+                title="Answer audio call"
               >
                 <Phone className="w-8 h-8" />
               </button>
@@ -1073,15 +1097,75 @@ const CallModal = () => {
           </div>
         )}
 
-        {/* Active call UI */}
+        {/* Incoming Video Call UI */}
+        {incomingCall && !isInCall && incomingCallType === 'video' && (
+          <div className="p-8 text-center bg-gradient-to-br from-blue-500 to-purple-600 text-white rounded-lg">
+            <div className="mb-6">
+              {/* Video call icon */}
+              <div className="relative mx-auto w-24 h-24 mb-6 bg-white/20 rounded-full flex items-center justify-center">
+                <VideoIcon className="w-12 h-12 text-white animate-pulse" />
+                <div className="absolute inset-0 rounded-full border-4 border-white opacity-30 animate-ping"></div>
+                <div className="absolute inset-0 rounded-full border-4 border-white opacity-20 animate-ping" style={{animationDelay: '0.5s'}}></div>
+              </div>
+              
+              <div className="relative mx-auto w-32 h-32 mb-4">
+                <Avatar className="w-32 h-32 mx-auto border-4 border-white shadow-lg">
+                  <AvatarImage src={selectedUserImage} />
+                  <AvatarFallback className="bg-white/20 text-white text-4xl font-bold">
+                    {incomingCall.callerUsername?.charAt(0).toUpperCase() || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
+              
+              <h3 className="text-2xl font-bold mb-2">
+                {incomingCall.callerUsername || 'Unknown User'}
+              </h3>
+              <p className="text-white/80 text-lg mb-2 flex items-center justify-center">
+                <VideoIcon className="w-5 h-5 mr-2" />
+                Incoming video call...
+              </p>
+              
+              <div className="flex justify-center items-center space-x-2">
+                <div className="flex space-x-1">
+                  <div className="w-2 h-2 bg-white rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                  <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex justify-center space-x-8">
+              <button
+                onClick={rejectCall}
+                className="bg-red-500 hover:bg-red-600 text-white rounded-full p-6 shadow-lg transform hover:scale-105 transition-all duration-200"
+                title="Decline video call"
+              >
+                <PhoneOff className="w-8 h-8" />
+              </button>
+              <button
+                onClick={answerCall}
+                className="bg-green-500 hover:bg-green-600 text-white rounded-full p-6 shadow-lg transform hover:scale-105 transition-all duration-200 animate-pulse"
+                title="Answer video call"
+              >
+                <VideoIcon className="w-8 h-8" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Active call UI (existing code remains the same) */}
         {isInCall && (
           <div className={`relative ${isCallFullscreen ? 'h-full' : 'h-96'}`}>
             {/* Call header */}
             <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/50 to-transparent z-10">
               <div className="flex justify-between items-center text-white">
-                <div>
-                  <h3 className="font-semibold text-lg">{selectedUser}</h3>
-                  <CallStatusDisplay />
+                <div className="flex items-center space-x-2">
+                  {callType === 'audio' && <Phone className="w-5 h-5" />}
+                  {callType === 'video' && <VideoIcon className="w-5 h-5" />}
+                  <div>
+                    <h3 className="font-semibold text-lg">{selectedUser}</h3>
+                    <CallStatusDisplay />
+                  </div>
                 </div>
                 <div className="flex space-x-2">
                   <Button
@@ -1156,14 +1240,10 @@ const CallModal = () => {
                   />
                 )}
                 
-                <div className="flex flex-col items-center justify-center h-full bg-gradient-to-br from-blue-500 to-purple-600 text-white">
-                  <div className="relative mb-8">
-                    <Avatar className="w-40 h-40 border-4 border-white shadow-lg">
-                      <AvatarImage src={selectedUserImage} />
-                      <AvatarFallback className="bg-white/20 text-white text-5xl font-bold">
-                        {selectedUser?.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
+                <div className="flex flex-col items-center justify-center h-full bg-gradient-to-br from-green-500 to-blue-600 text-white">
+                  {/* Audio call icon */}
+                  <div className="relative mb-8 w-24 h-24 bg-white/20 rounded-full flex items-center justify-center">
+                    <Phone className="w-12 h-12 text-white" />
                     {isRinging && (
                       <>
                         <div className="absolute inset-0 rounded-full border-4 border-white opacity-30 animate-ping"></div>
@@ -1171,7 +1251,21 @@ const CallModal = () => {
                       </>
                     )}
                   </div>
-                  <h3 className="text-3xl font-bold mb-4">{selectedUser}</h3>
+                  
+                  <div className="relative mb-8">
+                    <Avatar className="w-40 h-40 border-4 border-white shadow-lg">
+                      <AvatarImage src={selectedUserImage} />
+                      <AvatarFallback className="bg-white/20 text-white text-5xl font-bold">
+                        {selectedUser?.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                  </div>
+                  
+                  <h3 className="text-3xl font-bold mb-2">{selectedUser}</h3>
+                  <p className="text-white/80 text-lg mb-4 flex items-center">
+                    <Phone className="w-5 h-5 mr-2" />
+                    Audio Call
+                  </p>
                   <CallStatusDisplay />
                 </div>
               </div>

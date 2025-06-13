@@ -91,10 +91,10 @@ const Chat = () => {
   const [isRinging, setIsRinging] = useState(false);
   const [ringtone, setRingtone] = useState(null);
   const [callTimeout, setCallTimeout] = useState(null);
-// 1. Updated state management for better call type detection
-const [callMetadata, setCallMetadata] = useState(null); // Store call type info
-const [isInitiatingCall, setIsInitiatingCall] = useState(false);
-const [callHistory, setCallHistory] = useState([]);
+  const [callMetadata, setCallMetadata] = useState(null); // Store call type info
+  const [isInitiatingCall, setIsInitiatingCall] = useState(false);
+  const [callHistory, setCallHistory] = useState([]);
+
   const chatEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const imageInputRef = useRef(null);
@@ -123,15 +123,11 @@ const [callHistory, setCallHistory] = useState([]);
   }, []);
 
 
-  // Enhanced Call System with proper audio/video detection and UI fixes
-
-
-
 // 2. Enhanced convertEmailToPeerId with better validation
-const convertEmailToPeerId = (email) => {
-  if (!email) return null;
-  return email.replace(/[@.]/g, '_').toLowerCase();
-};
+  const convertEmailToPeerId = (email) => {
+    if (!email) return null;
+    return email.replace(/[@.]/g, '_').toLowerCase();
+  };
 
 const convertPeerIdToEmail = (peerId) => {
   if (!peerId || !peerId.includes('_')) return peerId + '@demo.com';
@@ -271,7 +267,7 @@ const answerCall = async () => {
       clearTimeout(incomingCall.autoRejectTimeout);
     }
 
-    // Get media with proper constraints based on call type
+    // Fix: Get media with proper constraints based on INCOMING call type
     const constraints = {
       video: incomingCallType === 'video',
       audio: true
@@ -280,11 +276,11 @@ const answerCall = async () => {
     console.log('Answering with constraints:', constraints);
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     setLocalStream(stream);
-    setCallType(incomingCallType);
+    setCallType(incomingCallType); // Use the detected incoming call type
     setIsInCall(true);
     setCallStatus('connecting');
 
-    if (localVideoRef.current) {
+    if (localVideoRef.current && incomingCallType === 'video') {
       localVideoRef.current.srcObject = stream;
     }
 
@@ -317,6 +313,7 @@ const answerCall = async () => {
     rejectCall();
   }
 };
+
 
 // 6. Helper functions for better error handling
 const handleCallTimeout = () => {
@@ -698,10 +695,9 @@ const CallStatusDisplay = () => {
 // Add these state variables to track call type detection
 const [incomingCallType, setIncomingCallType] = useState(null); // 'audio' or 'video'
 
-// Enhanced handleIncomingCall function to detect call type
 const handleIncomingCall = (call) => {
   console.log('Incoming call from peer:', call.peer);
-  console.log('Converting peer ID to email:', call.peer);
+  console.log('Call metadata:', call.metadata);
   
   // Fix: Better peer ID to username conversion
   let callerUsername;
@@ -720,18 +716,10 @@ const handleIncomingCall = (call) => {
   );
   const callerName = callerUser ? callerUser.user_name : callerUsername;
   
-  // Detect call type by checking if caller has video stream
-  // This is a bit tricky with PeerJS, so we'll use a different approach
-  // We'll assume video call initially and update based on stream
-  setIncomingCallType('video'); // Default to video, will be updated when stream is received
-  
-  // Set up stream detection
-  call.on('stream', (remoteStream) => {
-    const videoTracks = remoteStream.getVideoTracks();
-    const detectedCallType = videoTracks.length > 0 ? 'video' : 'audio';
-    setIncomingCallType(detectedCallType);
-    console.log('Detected call type:', detectedCallType);
-  });
+  // Fix: Get call type from metadata instead of guessing
+  const detectedCallType = call.metadata?.type || 'audio'; // Default to audio if no metadata
+  setIncomingCallType(detectedCallType);
+  console.log('Detected call type from metadata:', detectedCallType);
   
   call.callerUsername = callerName;
   setIncomingCall(call);
@@ -743,8 +731,15 @@ const handleIncomingCall = (call) => {
     ringtone.currentTime = 0;
     ringtone.play().catch(console.error);
   }
+  
+  // Auto-reject after 30 seconds
+  const autoRejectTimeout = setTimeout(() => {
+    console.log('Auto-rejecting call after timeout');
+    rejectCall();
+  }, 30000);
+  
+  call.autoRejectTimeout = autoRejectTimeout;
 };
-
 // 4. Fixed answerCall function 
 
 // Call Error Modal Component
@@ -1145,19 +1140,41 @@ const findActivePeerForUser = async (username) => {
 
 const AudioVideoElement = ({ stream, muted = false, className = "", isAudioOnly = false }) => {
   const videoRef = useRef(null);
+  const audioRef = useRef(null);
   
   useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
-      videoRef.current.muted = muted;
-      
-      // For audio-only calls, ensure audio plays
-      if (isAudioOnly && !muted) {
-        videoRef.current.volume = 1.0;
-        videoRef.current.play().catch(console.error);
+    if (stream) {
+      if (isAudioOnly) {
+        // For audio-only calls, use audio element
+        if (audioRef.current) {
+          audioRef.current.srcObject = stream;
+          audioRef.current.muted = muted;
+          if (!muted) {
+            audioRef.current.volume = 1.0;
+            audioRef.current.play().catch(console.error);
+          }
+        }
+      } else {
+        // For video calls, use video element
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.muted = muted;
+        }
       }
     }
   }, [stream, muted, isAudioOnly]);
+
+  if (isAudioOnly) {
+    return (
+      <audio
+        ref={audioRef}
+        autoPlay
+        playsInline
+        muted={muted}
+        style={{ display: 'none' }}
+      />
+    );
+  }
 
   return (
     <video
@@ -1165,7 +1182,7 @@ const AudioVideoElement = ({ stream, muted = false, className = "", isAudioOnly 
       autoPlay
       playsInline
       muted={muted}
-      className={`${className} ${isAudioOnly ? 'hidden' : ''}`}
+      className={className}
       style={{ 
         width: '100%', 
         height: '100%',
@@ -1174,11 +1191,11 @@ const AudioVideoElement = ({ stream, muted = false, className = "", isAudioOnly 
     />
   );
 };
-
 // Updated CallModal component with proper audio handling
 const CallModal = () => {
   if (!showCallModal) return null;
-const getCallTypeIcon = (type) => {
+
+  const getCallTypeIcon = (type) => {
     return type === 'audio' ? Phone : VideoIcon;
   };
 
@@ -1191,69 +1208,15 @@ const getCallTypeIcon = (type) => {
       ? 'from-green-500 to-blue-600' 
       : 'from-blue-500 to-purple-600';
   };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
       <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl ${
         isCallFullscreen ? 'w-full h-full' : 'w-96 max-w-lg'
       }`}>
         
-        {/* Incoming Audio Call UI */}
-        {incomingCall && !isInCall && incomingCallType === 'audio' && (
-          <div className="p-8 text-center bg-gradient-to-br from-green-500 to-blue-600 text-white rounded-lg">
-            <div className="mb-6">
-              {/* Audio call icon */}
-              <div className="relative mx-auto w-24 h-24 mb-6 bg-white/20 rounded-full flex items-center justify-center">
-                <Phone className="w-12 h-12 text-white animate-pulse" />
-                <div className="absolute inset-0 rounded-full border-4 border-white opacity-30 animate-ping"></div>
-                <div className="absolute inset-0 rounded-full border-4 border-white opacity-20 animate-ping" style={{animationDelay: '0.5s'}}></div>
-              </div>
-              
-              <div className="relative mx-auto w-32 h-32 mb-4">
-                <Avatar className="w-32 h-32 mx-auto border-4 border-white shadow-lg">
-                  <AvatarImage src={selectedUserImage} />
-                  <AvatarFallback className="bg-white/20 text-white text-4xl font-bold">
-                    {incomingCall.callerUsername?.charAt(0).toUpperCase() || 'U'}
-                  </AvatarFallback>
-                </Avatar>
-              </div>
-              
-              <h3 className="text-2xl font-bold mb-2">
-                {incomingCall.callerUsername || 'Unknown User'}
-              </h3>
-              <p className="text-white/80 text-lg mb-2 flex items-center justify-center">
-                <Phone className="w-5 h-5 mr-2" />
-                Incoming audio call...
-              </p>
-              
-              <div className="flex justify-center items-center space-x-2">
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-white rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                  <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex justify-center space-x-8">
-              <button
-                onClick={rejectCall}
-                className="bg-red-500 hover:bg-red-600 text-white rounded-full p-6 shadow-lg transform hover:scale-105 transition-all duration-200"
-                title="Decline audio call"
-              >
-                <PhoneOff className="w-8 h-8" />
-              </button>
-              <button
-                onClick={answerCall}
-                className="bg-green-500 hover:bg-green-600 text-white rounded-full p-6 shadow-lg transform hover:scale-105 transition-all duration-200 animate-pulse"
-                title="Answer audio call"
-              >
-                <Phone className="w-8 h-8" />
-              </button>
-            </div>
-          </div>
-        )}
-
-          {incomingCall && !isInCall && (
+        {/* Fix: Incoming Call UI - Show correct type based on incomingCallType */}
+        {incomingCall && !isInCall && (
           <div className={`p-8 text-center bg-gradient-to-br ${getGradientClass(incomingCallType)} text-white rounded-lg`}>
             <div className="mb-6">
               {/* Dynamic call type icon */}
@@ -1284,7 +1247,6 @@ const getCallTypeIcon = (type) => {
                 Incoming {getCallTypeLabel(incomingCallType).toLowerCase()}...
               </p>
               
-              {/* Enhanced status display */}
               <div className="flex justify-center items-center space-x-2 mb-4">
                 <div className="flex space-x-1">
                   <div className="w-2 h-2 bg-white rounded-full animate-bounce"></div>
@@ -1293,7 +1255,6 @@ const getCallTypeIcon = (type) => {
                 </div>
               </div>
               
-              {/* Call type specific info */}
               <div className="text-white/60 text-sm mb-4">
                 {incomingCallType === 'audio' ? (
                   <span>🎧 High quality audio call</span>
@@ -1303,7 +1264,6 @@ const getCallTypeIcon = (type) => {
               </div>
             </div>
             
-            {/* Action buttons */}
             <div className="flex justify-center space-x-8">
               <button
                 onClick={rejectCall}
@@ -1325,7 +1285,7 @@ const getCallTypeIcon = (type) => {
           </div>
         )}
 
-        {/* Active call UI (existing code remains the same) */}
+        {/* Fix: Active call UI with proper audio handling */}
         {isInCall && (
           <div className={`relative ${isCallFullscreen ? 'h-full' : 'h-96'}`}>
             {/* Call header */}
@@ -1335,7 +1295,7 @@ const getCallTypeIcon = (type) => {
                   {callType === 'audio' && <Phone className="w-5 h-5" />}
                   {callType === 'video' && <VideoIcon className="w-5 h-5" />}
                   <div>
-                    <h3 className="font-semibold text-lg">{selectedUser}</h3>
+                    <h3 className="font-semibold text-lg">{selectedUser || incomingCall?.callerUsername}</h3>
                     <CallStatusDisplay />
                   </div>
                 </div>
@@ -1356,7 +1316,7 @@ const getCallTypeIcon = (type) => {
               </div>
             </div>
 
-            {/* Video streams with proper audio handling */}
+            {/* Fix: Video streams with proper audio handling */}
             {callType === 'video' && (
               <div className="relative w-full h-full bg-gray-900">
                 {/* Remote video with audio */}
@@ -1364,6 +1324,7 @@ const getCallTypeIcon = (type) => {
                   stream={remoteStream}
                   muted={false}
                   className="w-full h-full object-cover"
+                  isAudioOnly={false}
                 />
                 
                 {/* Local video (muted to prevent echo) */}
@@ -1372,6 +1333,7 @@ const getCallTypeIcon = (type) => {
                     stream={localStream}
                     muted={true}
                     className="w-full h-full object-cover"
+                    isAudioOnly={false}
                   />
                 </div>
 
@@ -1383,7 +1345,7 @@ const getCallTypeIcon = (type) => {
                         <Avatar className="w-32 h-32 mx-auto border-4 border-white shadow-lg">
                           <AvatarImage src={selectedUserImage} />
                           <AvatarFallback className="bg-gray-600 text-white text-4xl">
-                            {selectedUser?.charAt(0).toUpperCase()}
+                            {(selectedUser || incomingCall?.callerUsername)?.charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                         {isRinging && (
@@ -1400,20 +1362,27 @@ const getCallTypeIcon = (type) => {
               </div>
             )}
 
-            {/* Audio call UI */}
+            {/* Fix: Audio call UI with proper audio element */}
             {callType === 'audio' && (
               <div className="relative w-full h-full">
-                {/* Hidden audio element for audio-only calls */}
+                {/* Audio elements for audio-only calls */}
                 {remoteStream && (
                   <AudioVideoElement 
                     stream={remoteStream}
                     muted={false}
-                    className="hidden"
+                    isAudioOnly={true}
+                  />
+                )}
+                
+                {localStream && (
+                  <AudioVideoElement 
+                    stream={localStream}
+                    muted={true}
+                    isAudioOnly={true}
                   />
                 )}
                 
                 <div className="flex flex-col items-center justify-center h-full bg-gradient-to-br from-green-500 to-blue-600 text-white">
-                  {/* Audio call icon */}
                   <div className="relative mb-8 w-24 h-24 bg-white/20 rounded-full flex items-center justify-center">
                     <Phone className="w-12 h-12 text-white" />
                     {isRinging && (
@@ -1428,12 +1397,12 @@ const getCallTypeIcon = (type) => {
                     <Avatar className="w-40 h-40 border-4 border-white shadow-lg">
                       <AvatarImage src={selectedUserImage} />
                       <AvatarFallback className="bg-white/20 text-white text-5xl font-bold">
-                        {selectedUser?.charAt(0).toUpperCase()}
+                        {(selectedUser || incomingCall?.callerUsername)?.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                   </div>
                   
-                  <h3 className="text-3xl font-bold mb-2">{selectedUser}</h3>
+                  <h3 className="text-3xl font-bold mb-2">{selectedUser || incomingCall?.callerUsername}</h3>
                   <p className="text-white/80 text-lg mb-4 flex items-center">
                     <Phone className="w-5 h-5 mr-2" />
                     Audio Call
@@ -1443,7 +1412,7 @@ const getCallTypeIcon = (type) => {
               </div>
             )}
 
-            {/* Call controls */}
+            {/* Call controls - same as before */}
             {(callStatus !== 'failed' && callStatus !== 'offline' && callStatus !== 'no-answer') && (
               <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/60 to-transparent">
                 <div className="flex justify-center space-x-6">
@@ -1510,7 +1479,7 @@ const getCallTypeIcon = (type) => {
       </div>
     </div>
   );
-};
+};;
   return (
     <div className="flex h-[75vh]  bg-[#f0f2f5] dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm">
       {/* Left sidebar - Contacts */}

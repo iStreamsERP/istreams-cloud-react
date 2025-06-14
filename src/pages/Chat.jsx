@@ -1479,7 +1479,7 @@ const CallModal = () => {
       </div>
     </div>
   );
-};;
+};
   return (
     <div className="flex h-[75vh]  bg-[#f0f2f5] dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm">
       {/* Left sidebar - Contacts */}

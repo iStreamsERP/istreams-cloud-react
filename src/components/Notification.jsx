@@ -32,7 +32,7 @@ const AllMessagesNotificationPopup = ({ notifications, onClose, onMessageClick }
           }
           return nextIndex;
         });
-      }, 3000);
+      }, 1000);
       
       return () => clearInterval(cycleTimer);
     }
@@ -59,17 +59,17 @@ const AllMessagesNotificationPopup = ({ notifications, onClose, onMessageClick }
   const currentNotification = notifications[currentIndex];
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 max-w-sm w-full">
+    <div className="fixed bottom-2 right-2 sm:bottom-4 sm:right-4 z-50 max-w-xs sm:max-w-sm w-full px-2 sm:px-0">
       <div 
-        className={`bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 transform transition-all duration-300 cursor-pointer hover:shadow-xl ${
+        className={`bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-2 sm:p-4 transform transition-all duration-300 cursor-pointer hover:shadow-xl ${
           isLeaving ? 'translate-y-full opacity-0' : 'translate-y-0 opacity-100'
         }`}
         onClick={() => handleNotificationClick(currentNotification)}
       >
         {/* Header with count indicator */}
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <Bell className="w-4 h-4 text-blue-500" />
+        <div className="flex items-center justify-between mb-1 sm:mb-2">
+          <div className="flex items-center gap-1 sm:gap-2">
+            <Bell className="w-3 h-3 sm:w-4 sm:h-4 text-blue-500" />
             <span className="text-xs font-medium text-blue-500">
               {currentIndex + 1} of {notifications.length} messages
             </span>
@@ -79,41 +79,41 @@ const AllMessagesNotificationPopup = ({ notifications, onClose, onMessageClick }
               e.stopPropagation();
               handleClose();
             }}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1"
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-0.5 sm:p-1"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3 h-3 sm:w-4 sm:h-4" />
           </button>
         </div>
 
-        <div className="flex items-start gap-3">
-          <Avatar className="h-10 w-10 rounded-full border-2 border-blue-100 dark:border-gray-700 overflow-hidden flex-shrink-0">
+        <div className="flex items-start gap-2 sm:gap-3">
+          <Avatar className="h-8 w-8 sm:h-10 sm:w-10 rounded-full border-2 border-blue-100 dark:border-gray-700 overflow-hidden flex-shrink-0">
             <AvatarImage
               src={currentNotification.icon}
               alt={currentNotification.userName}
               className="object-cover h-full w-full"
             />
-            <AvatarFallback className="bg-blue-100 dark:bg-gray-700 text-blue-600 dark:text-blue-300">
+            <AvatarFallback className="bg-blue-100 dark:bg-gray-700 text-blue-600 dark:text-blue-300 text-xs sm:text-sm">
               {currentNotification.userName.substring(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
           
           <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-1">
-              <h4 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+            <div className="flex items-center justify-between mb-0.5 sm:mb-1">
+              <h4 className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white truncate">
                 {currentNotification.userName}
               </h4>
               <span className="text-xs text-gray-500 dark:text-gray-400">
                 {currentNotification.time}
               </span>
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2">
+            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 line-clamp-2">
               {currentNotification.message}
             </p>
           </div>
         </div>
         
         {/* Progress indicators */}
-        <div className="mt-3 flex gap-1">
+        <div className="mt-2 sm:mt-3 flex gap-1">
           {notifications.map((_, index) => (
             <div 
               key={index}
@@ -168,28 +168,28 @@ const NotificationPopup = ({ notification, onClose, onMessageClick }) => {
   if (!notification || !isVisible) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 max-w-sm w-full">
+    <div className="fixed bottom-2 right-2 sm:bottom-4 sm:right-4 z-50 max-w-xs sm:max-w-sm w-full px-2 sm:px-0">
       <div 
-        className={`bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 transform transition-all duration-300 cursor-pointer hover:shadow-xl ${
+        className={`bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-2 sm:p-4 transform transition-all duration-300 cursor-pointer hover:shadow-xl ${
           isLeaving ? 'translate-y-full opacity-0' : 'translate-y-0 opacity-100'
         }`}
         onClick={handleNotificationClick}
       >
-        <div className="flex items-start gap-3">
-          <Avatar className="h-10 w-10 rounded-full border-2 border-blue-100 dark:border-gray-700 overflow-hidden flex-shrink-0">
+        <div className="flex items-start gap-2 sm:gap-3">
+          <Avatar className="h-8 w-8 sm:h-10 sm:w-10 rounded-full border-2 border-blue-100 dark:border-gray-700 overflow-hidden flex-shrink-0">
             <AvatarImage
               src={notification.icon}
               alt={notification.userName}
               className="object-cover h-full w-full"
             />
-            <AvatarFallback className="bg-blue-100 dark:bg-gray-700 text-blue-600 dark:text-blue-300">
+            <AvatarFallback className="bg-blue-100 dark:bg-gray-700 text-blue-600 dark:text-blue-300 text-xs sm:text-sm">
               {notification.userName.substring(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
           
           <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-1">
-              <h4 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+            <div className="flex items-center justify-between mb-0.5 sm:mb-1">
+              <h4 className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white truncate">
                 New message from {notification.userName}
               </h4>
               <button 
@@ -197,19 +197,19 @@ const NotificationPopup = ({ notification, onClose, onMessageClick }) => {
                   e.stopPropagation();
                   handleClose();
                 }}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-0.5 sm:p-1"
               >
-                <X className="w-4 h-4" />
+                <X className="w-3 h-3 sm:w-4 sm:h-4" />
               </button>
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2">
+            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 line-clamp-2">
               {notification.message}
             </p>
           </div>
         </div>
         
         {/* Progress bar */}
-        <div className="mt-3 h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+        <div className="mt-2 sm:mt-3 h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
           <div 
             className="h-full bg-blue-500 rounded-full"
             style={{

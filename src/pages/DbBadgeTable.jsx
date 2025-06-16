@@ -162,11 +162,7 @@ const DbBadgeTable = () => {
         DashBoardID: parseInt(DashBoardID),
         BadgeNo: parseInt(BadgeNo),
       };
-      // const master = await getDashBoardBadgeDetails(
-      //   payload,
-      //   userData.currentUserLogin,
-      //   userData.clientURL
-      // );
+  
       const master = await callSoapService(userData.clientURL, "BI_GetDashboard_BadgeDetails_Data", payload);
       
       setDbData(master);
@@ -340,24 +336,366 @@ const DbBadgeTable = () => {
   };
 
   // Excel-like filter functions
-  const handleColumnFilterChange = (column, value, checked) => {
-    setColumnFilters(prev => {
-      const newFilters = { ...prev };
-      if (!newFilters[column]) {
-        newFilters[column] = new Set();
-      } else {
-        newFilters[column] = new Set(newFilters[column]);
-      }
-      
+// Excel-like Filter Component with Advanced Operators
+const ExcelFilter = ({ column }) => {
+  const [searchFilter, setSearchFilter] = useState("");
+  const [filterMode, setFilterMode] = useState("checkbox"); // "checkbox" or "advanced"
+  const [operator, setOperator] = useState("=");
+  const [filterValue, setFilterValue] = useState("");
+  const [tempSelectedValues, setTempSelectedValues] = useState(new Set()); // Temporary state for OK/Cancel
+  const [sortOrder, setSortOrder] = useState("asc"); // "asc" or "desc"
+  
+  const values = columnValues[column] || [];
+  const selectedValues = columnFilters[column] || new Set();
+  
+  // Sort values based on sort order
+  const sortedValues = [...values].sort((a, b) => {
+    // Handle numeric sorting
+    const aNum = parseFloat(a);
+    const bNum = parseFloat(b);
+    
+    if (!isNaN(aNum) && !isNaN(bNum)) {
+      return sortOrder === "asc" ? aNum - bNum : bNum - aNum;
+    }
+    
+    // Handle string sorting
+    const comparison = a.localeCompare(b);
+    return sortOrder === "asc" ? comparison : -comparison;
+  });
+  
+  const filteredValues = sortedValues.filter(value =>
+    value.toLowerCase().includes(searchFilter.toLowerCase())
+  );
+
+  const isAllSelected = tempSelectedValues.size === values.length;
+  const isIndeterminate = tempSelectedValues.size > 0 && tempSelectedValues.size < values.length;
+
+  // Initialize temp state when opening filter
+  const handleOpenChange = (open) => {
+    if (open) {
+      setTempSelectedValues(new Set(selectedValues));
+    }
+  };
+
+  const handleTempFilterChange = (value, checked) => {
+    setTempSelectedValues(prev => {
+      const newSet = new Set(prev);
       if (checked) {
-        newFilters[column].add(value);
+        newSet.add(value);
       } else {
-        newFilters[column].delete(value);
+        newSet.delete(value);
       }
-      
-      return newFilters;
+      return newSet;
     });
   };
+
+  const handleTempSelectAll = (checked) => {
+    if (checked) {
+      setTempSelectedValues(new Set(values));
+    } else {
+      setTempSelectedValues(new Set());
+    }
+  };
+
+  const handleApplyFilter = () => {
+    setColumnFilters(prev => ({
+      ...prev,
+      [column]: new Set(tempSelectedValues)
+    }));
+  };
+
+  const handleCancelFilter = () => {
+    setTempSelectedValues(new Set(selectedValues));
+    setSearchFilter("");
+  };
+
+  const applyAdvancedFilter = () => {
+    if (!filterValue.trim()) return;
+    
+    // Create a Set with values that match the advanced filter criteria
+    const matchingValues = new Set();
+    
+    values.forEach(itemValue => {
+      let match = false;
+      
+      switch (operator) {
+        case "=":
+          match = itemValue === filterValue;
+          break;
+        case "!=":
+          match = itemValue !== filterValue;
+          break;
+        case "contains":
+          match = itemValue.toLowerCase().includes(filterValue.toLowerCase());
+          break;
+        case "startsWith":
+          match = itemValue.toLowerCase().startsWith(filterValue.toLowerCase());
+          break;
+        case "endsWith":
+          match = itemValue.toLowerCase().endsWith(filterValue.toLowerCase());
+          break;
+        case "in":
+          match = filterValue.split(",").map(v => v.trim()).includes(itemValue);
+          break;
+        case "notIn":
+          match = !filterValue.split(",").map(v => v.trim()).includes(itemValue);
+          break;
+        default:
+          match = true;
+      }
+      
+      if (match) {
+        matchingValues.add(itemValue);
+      }
+    });
+    
+    // Update the column filter
+    setColumnFilters(prev => ({
+      ...prev,
+      [column]: matchingValues
+    }));
+  };
+
+  const resetAdvancedFilter = () => {
+    setFilterValue("");
+    setOperator("=");
+    // Reset to show all values
+    setColumnFilters(prev => ({
+      ...prev,
+      [column]: new Set(values)
+    }));
+  };
+
+  return (
+    <Popover onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className={`h-6 w-6 p-0 hover:bg-muted ${
+            selectedValues.size < values.length ? 'text-blue-600' : ''
+          }`}
+        >
+          <ChevronDown className="h-3 w-3" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-0" align="start">
+        {/* Filter Mode Toggle */}
+        <div className="p-3 border-b">
+          <div className="flex gap-1 mb-3">
+            <Button
+              variant={filterMode === "checkbox" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setFilterMode("checkbox")}
+              className="flex-1 h-7 text-xs"
+            >
+              Checkbox Filter
+            </Button>
+            <Button
+              variant={filterMode === "advanced" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setFilterMode("advanced")}
+              className="flex-1 h-7 text-xs"
+            >
+              Advanced Filter
+            </Button>
+          </div>
+              {/* Sort Order Toggle */}
+              <div className="flex gap-1">
+                <Button
+                  variant={sortOrder === "asc" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setSortOrder("asc")}
+                  className="flex-1 h-7 text-xs"
+                >
+                  A→Z
+                </Button>
+                <Button
+                  variant={sortOrder === "desc" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setSortOrder("desc")}
+                  className="flex-1 h-7 text-xs"
+                >
+                  Z→A
+                </Button>
+              </div>
+          {filterMode === "checkbox" && (
+            <>
+              <div className="relative mb-2 mt-2">
+                <Search className="absolute left-2 top-2.5 h-3 w-3 text-muted-foreground" />
+                <Input
+                  placeholder="Search values..."
+                  value={searchFilter}
+                  onChange={(e) => setSearchFilter(e.target.value)}
+                  className="pl-7 h-8 text-sm"
+                />
+              </div>
+              
+          
+            </>
+          )}
+        </div>
+
+        {filterMode === "checkbox" ? (
+          <>
+            {/* Checkbox Filter Mode */}
+            <div className="p-2 border-b">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id={`select-all-${column}`}
+                  checked={isAllSelected}
+                  onCheckedChange={(checked) => handleTempSelectAll(checked)}
+                  className="data-[state=indeterminate]:bg-primary data-[state=indeterminate]:text-primary-foreground"
+                  {...(isIndeterminate && { 'data-state': 'indeterminate' })}
+                />
+                <Label htmlFor={`select-all-${column}`} className="text-sm font-medium">
+                  Select All
+                </Label>
+              </div>
+            </div>
+            
+            <div className="max-h-48 overflow-y-auto">
+              {filteredValues.length === 0 ? (
+                <div className="p-3 text-sm text-muted-foreground text-center">
+                  No items found
+                </div>
+              ) : (
+                filteredValues.map((value) => (
+                  <div key={value} className="flex items-center space-x-2 p-2 hover:bg-muted">
+                    <Checkbox
+                      id={`${column}-${value}`}
+                      checked={tempSelectedValues.has(value)}
+                      onCheckedChange={(checked) => handleTempFilterChange(value, checked)}
+                    />
+                    <Label 
+                      htmlFor={`${column}-${value}`} 
+                      className="text-sm flex-1 cursor-pointer truncate"
+                      title={value}
+                    >
+                      {value}
+                    </Label>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* OK/Cancel Buttons for Checkbox Mode */}
+            <div className="p-3 border-t flex gap-2">
+              <Button 
+                size="sm" 
+                onClick={handleApplyFilter}
+                className="flex-1"
+              >
+                OK
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleCancelFilter}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Advanced Filter Mode */}
+            <div className="p-3 space-y-3">
+              <div>
+                <Label className="text-sm font-medium mb-1 block">Operator</Label>
+                <Select value={operator} onValueChange={setOperator}>
+                  <SelectTrigger className="h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="=">Equal (=)</SelectItem>
+                    <SelectItem value="!=">Not Equal (!=)</SelectItem>
+                    <SelectItem value="contains">Contains</SelectItem>
+                    <SelectItem value="startsWith">Starts With</SelectItem>
+                    <SelectItem value="endsWith">Ends With</SelectItem>
+                    <SelectItem value="in">In (comma separated)</SelectItem>
+                    <SelectItem value="notIn">Not In (comma separated)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium mb-1 block">Value</Label>
+                <Input
+                  placeholder={
+                    operator === "in" || operator === "notIn" 
+                      ? "value1, value2, value3" 
+                      : "Enter value..."
+                  }
+                  value={filterValue}
+                  onChange={(e) => setFilterValue(e.target.value)}
+                  className="h-8 text-sm"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      applyAdvancedFilter();
+                    }
+                  }}
+                />
+                {(operator === "in" || operator === "notIn") && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Separate values with commas
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                <Button 
+                  size="sm" 
+                  onClick={applyAdvancedFilter}
+                  disabled={!filterValue.trim()}
+                  className="flex-1"
+                >
+                  Apply Filter
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={resetAdvancedFilter}
+                  className="flex-1"
+                >
+                  Reset
+                </Button>
+              </div>
+
+              {/* Preview of matching values */}
+              {filterValue.trim() && (
+                <div className="border-t pt-3">
+                  <Label className="text-xs font-medium text-muted-foreground">
+                    Preview ({operator} "{filterValue}"):
+                  </Label>
+                  <div className="max-h-24 overflow-y-auto mt-1 text-xs">
+                    {values.filter(itemValue => {
+                      switch (operator) {
+                        case "=": return itemValue === filterValue;
+                        case "!=": return itemValue !== filterValue;
+                        case "contains": return itemValue.toLowerCase().includes(filterValue.toLowerCase());
+                        case "startsWith": return itemValue.toLowerCase().startsWith(filterValue.toLowerCase());
+                        case "endsWith": return itemValue.toLowerCase().endsWith(filterValue.toLowerCase());
+                        case "in": return filterValue.split(",").map(v => v.trim()).includes(itemValue);
+                        case "notIn": return !filterValue.split(",").map(v => v.trim()).includes(itemValue);
+                        default: return true;
+                      }
+                    }).slice(0, 10).map((value, idx) => (
+                      <div key={idx} className="text-muted-foreground py-0.5">
+                        {value}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+};
 
   const handleSelectAllFilter = (column, checked) => {
     setColumnFilters(prev => {
@@ -445,269 +783,6 @@ const DbBadgeTable = () => {
     navigate(-1); // Go back one step in history
   };
 
-  // Excel-like Filter Component with Advanced Operators
-  const ExcelFilter = ({ column }) => {
-    const [searchFilter, setSearchFilter] = useState("");
-    const [filterMode, setFilterMode] = useState("checkbox"); // "checkbox" or "advanced"
-    const [operator, setOperator] = useState("=");
-    const [filterValue, setFilterValue] = useState("");
-    
-    const values = columnValues[column] || [];
-    const selectedValues = columnFilters[column] || new Set();
-    
-    const filteredValues = values.filter(value =>
-      value.toLowerCase().includes(searchFilter.toLowerCase())
-    );
-
-    const isAllSelected = selectedValues.size === values.length;
-    const isIndeterminate = selectedValues.size > 0 && selectedValues.size < values.length;
-
-    const applyAdvancedFilter = () => {
-      if (!filterValue.trim()) return;
-      
-      // Create a Set with values that match the advanced filter criteria
-      const matchingValues = new Set();
-      
-      values.forEach(itemValue => {
-        let match = false;
-        
-        switch (operator) {
-          case "=":
-            match = itemValue === filterValue;
-            break;
-          case "!=":
-            match = itemValue !== filterValue;
-            break;
-          case "contains":
-            match = itemValue.toLowerCase().includes(filterValue.toLowerCase());
-            break;
-          case "startsWith":
-            match = itemValue.toLowerCase().startsWith(filterValue.toLowerCase());
-            break;
-          case "endsWith":
-            match = itemValue.toLowerCase().endsWith(filterValue.toLowerCase());
-            break;
-          case "in":
-            match = filterValue.split(",").map(v => v.trim()).includes(itemValue);
-            break;
-          case "notIn":
-            match = !filterValue.split(",").map(v => v.trim()).includes(itemValue);
-            break;
-          default:
-            match = true;
-        }
-        
-        if (match) {
-          matchingValues.add(itemValue);
-        }
-      });
-      
-      // Update the column filter
-      setColumnFilters(prev => ({
-        ...prev,
-        [column]: matchingValues
-      }));
-    };
-
-    const resetAdvancedFilter = () => {
-      setFilterValue("");
-      setOperator("=");
-      // Reset to show all values
-      setColumnFilters(prev => ({
-        ...prev,
-        [column]: new Set(values)
-      }));
-    };
-
-    return (
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className={`h-6 w-6 p-0 hover:bg-muted ${
-              selectedValues.size < values.length ? 'text-blue-600' : ''
-            }`}
-          >
-            <ChevronDown className="h-3 w-3" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-80 p-0" align="start">
-          {/* Filter Mode Toggle */}
-          <div className="p-3 border-b">
-            <div className="flex gap-1 mb-3">
-              <Button
-                variant={filterMode === "checkbox" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setFilterMode("checkbox")}
-                className="flex-1 h-7 text-xs"
-              >
-                Checkbox Filter
-              </Button>
-              <Button
-                variant={filterMode === "advanced" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setFilterMode("advanced")}
-                className="flex-1 h-7 text-xs"
-              >
-                Advanced Filter
-              </Button>
-            </div>
-            
-            {filterMode === "checkbox" && (
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-3 w-3 text-muted-foreground" />
-                <Input
-                  placeholder="Search values..."
-                  value={searchFilter}
-                  onChange={(e) => setSearchFilter(e.target.value)}
-                  className="pl-7 h-8 text-sm"
-                />
-              </div>
-            )}
-          </div>
-
-          {filterMode === "checkbox" ? (
-            <>
-              {/* Checkbox Filter Mode */}
-              <div className="p-2 border-b">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`select-all-${column}`}
-                    checked={isAllSelected}
-                    onCheckedChange={(checked) => handleSelectAllFilter(column, checked)}
-                    className="data-[state=indeterminate]:bg-primary data-[state=indeterminate]:text-primary-foreground"
-                    {...(isIndeterminate && { 'data-state': 'indeterminate' })}
-                  />
-                  <Label htmlFor={`select-all-${column}`} className="text-sm font-medium">
-                    Select All
-                  </Label>
-                </div>
-              </div>
-              
-              <div className="max-h-48 overflow-y-auto">
-                {filteredValues.length === 0 ? (
-                  <div className="p-3 text-sm text-muted-foreground text-center">
-                    No items found
-                  </div>
-                ) : (
-                  filteredValues.map((value) => (
-                    <div key={value} className="flex items-center space-x-2 p-2 hover:bg-muted">
-                      <Checkbox
-                        id={`${column}-${value}`}
-                        checked={selectedValues.has(value)}
-                        onCheckedChange={(checked) => handleColumnFilterChange(column, value, checked)}
-                      />
-                      <Label 
-                        htmlFor={`${column}-${value}`} 
-                        className="text-sm flex-1 cursor-pointer truncate"
-                        title={value}
-                      >
-                        {value}
-                      </Label>
-                    </div>
-                  ))
-                )}
-              </div>
-            </>
-          ) : (
-            <>
-              {/* Advanced Filter Mode */}
-              <div className="p-3 space-y-3">
-                <div>
-                  <Label className="text-sm font-medium mb-1 block">Operator</Label>
-                  <Select value={operator} onValueChange={setOperator}>
-                    <SelectTrigger className="h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="=">Equal (=)</SelectItem>
-                      <SelectItem value="!=">Not Equal (!=)</SelectItem>
-                      <SelectItem value="contains">Contains</SelectItem>
-                      <SelectItem value="startsWith">Starts With</SelectItem>
-                      <SelectItem value="endsWith">Ends With</SelectItem>
-                      <SelectItem value="in">In (comma separated)</SelectItem>
-                      <SelectItem value="notIn">Not In (comma separated)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label className="text-sm font-medium mb-1 block">Value</Label>
-                  <Input
-                    placeholder={
-                      operator === "in" || operator === "notIn" 
-                        ? "value1, value2, value3" 
-                        : "Enter value..."
-                    }
-                    value={filterValue}
-                    onChange={(e) => setFilterValue(e.target.value)}
-                    className="h-8 text-sm"
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        applyAdvancedFilter();
-                      }
-                    }}
-                  />
-                  {(operator === "in" || operator === "notIn") && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Separate values with commas
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex gap-2">
-                  <Button 
-                    size="sm" 
-                    onClick={applyAdvancedFilter}
-                    disabled={!filterValue.trim()}
-                    className="flex-1"
-                  >
-                    Apply Filter
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={resetAdvancedFilter}
-                    className="flex-1"
-                  >
-                    Reset
-                  </Button>
-                </div>
-
-                {/* Preview of matching values */}
-                {filterValue.trim() && (
-                  <div className="border-t pt-3">
-                    <Label className="text-xs font-medium text-muted-foreground">
-                      Preview ({operator} "{filterValue}"):
-                    </Label>
-                    <div className="max-h-24 overflow-y-auto mt-1 text-xs">
-                      {values.filter(itemValue => {
-                        switch (operator) {
-                          case "=": return itemValue === filterValue;
-                          case "!=": return itemValue !== filterValue;
-                          case "contains": return itemValue.toLowerCase().includes(filterValue.toLowerCase());
-                          case "startsWith": return itemValue.toLowerCase().startsWith(filterValue.toLowerCase());
-                          case "endsWith": return itemValue.toLowerCase().endsWith(filterValue.toLowerCase());
-                          case "in": return filterValue.split(",").map(v => v.trim()).includes(itemValue);
-                          case "notIn": return !filterValue.split(",").map(v => v.trim()).includes(itemValue);
-                          default: return true;
-                        }
-                      }).slice(0, 10).map((value, idx) => (
-                        <div key={idx} className="text-muted-foreground py-0.5">
-                          {value}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </PopoverContent>
-      </Popover>
-    );
-  };
 
   return (
     <div className="space-y-6">

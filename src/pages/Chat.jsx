@@ -107,7 +107,463 @@ const Chat = () => {
     fetchUsersAndMessages();
     initializePeer();
   }, []);
+// Enhanced WebRTC calling system with Metered TURN servers
 
+// 1. METERED TURN SERVER CONFIGURATION
+// Replace these with your actual Metered credentials
+const METERED_TURN_CONFIG = {
+  // Your Metered TURN server URLs
+  urls: [
+    'turn:a.relay.metered.ca:80',
+    'turn:a.relay.metered.ca:80?transport=tcp',
+    'turn:a.relay.metered.ca:443',
+    'turn:a.relay.metered.ca:443?transport=tcp'
+  ],
+  // Your Metered username (found in dashboard)
+  username: 'istreams_erp.metered.live', // Replace with your actual username
+  // Your Metered credential/password (found in dashboard)
+  credential: 'hsVFk7-VIpczMpZPnaMhy_kc4aGLC1rN90GDKO5r2rag85UM' // Replace with your actual credential
+};
+
+// 2. Enhanced ICE servers configuration with Metered TURN
+const getICEServers = () => {
+  return [
+    // Google STUN servers (free, for basic connectivity)
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
+    
+    // Metered TURN servers (premium, for NAT traversal)
+    METERED_TURN_CONFIG,
+    
+    // Additional TURN servers for redundancy
+    {
+      urls: [
+        'turn:b.relay.metered.ca:80',
+        'turn:b.relay.metered.ca:80?transport=tcp',
+        'turn:b.relay.metered.ca:443',
+        'turn:b.relay.metered.ca:443?transport=tcp'
+      ],
+      username: METERED_TURN_CONFIG.username,
+      credential: METERED_TURN_CONFIG.credential
+    }
+  ];
+};
+
+// 3. Enhanced peer initialization with Metered TURN
+const initializePeer = () => {
+  if (!userData?.userEmail) {
+    console.error('User email not available for peer initialization');
+    return;
+  }
+  
+  const peerId = convertEmailToPeerId(userData.userEmail.toLowerCase());
+  console.log('Initializing peer with Metered TURN:', { userEmail: userData.userEmail, peerId });
+  
+  // Destroy existing peer
+  if (peer && !peer.destroyed) {
+    peer.destroy();
+  }
+  
+  const peerInstance = new window.Peer(peerId, {
+    host: '0.peerjs.com',
+    port: 443,
+    path: '/',
+    secure: true,
+    debug: 1,
+    config: {
+      // Enhanced ICE servers with Metered TURN
+      iceServers: getICEServers(),
+      
+      // Additional WebRTC configuration for better connectivity
+      iceCandidatePoolSize: 10,
+      iceTransportPolicy: 'all', // Use both STUN and TURN
+      bundlePolicy: 'balanced',
+      rtcpMuxPolicy: 'require',
+      
+      // Enable continuous gathering for better connection reliability
+      continualGatheringPolicy: 'gather_continually'
+    }
+  });
+
+  // Enhanced connection monitoring
+  peerInstance.on('open', (id) => {
+    console.log('✅ Peer connected successfully with Metered TURN support. ID:', id);
+    setPeer(peerInstance);
+    
+    // Test TURN server connectivity
+    testTURNConnectivity();
+  });
+
+  peerInstance.on('call', handleIncomingCall);
+
+  peerInstance.on('error', (error) => {
+    console.error('❌ Peer error:', error);
+    
+    if (error.type === 'peer-destroyed') {
+      console.log('🔄 Peer destroyed, reconnecting with TURN...');
+      setTimeout(() => {
+        initializePeer();
+      }, 2000);
+    } else {
+      let errorMessage = 'Connection error. Please refresh and try again.';
+      if (error.type === 'unavailable-id') {
+        errorMessage = 'Your session has expired. Please refresh the page.';
+      } else if (error.type === 'network') {
+        errorMessage = 'Network connection failed. Checking TURN server connectivity...';
+        testTURNConnectivity();
+      }
+      setCallError(errorMessage);
+      setShowCallError(true);
+    }
+  });
+
+  peerInstance.on('disconnected', () => {
+    console.log('⚠️ Peer disconnected, attempting to reconnect with TURN support...');
+    setTimeout(() => {
+      if (!peerInstance.destroyed) {
+        peerInstance.reconnect();
+      }
+    }, 1000);
+  });
+
+  peerInstance.on('connection', (conn) => {
+    console.log('🔗 Data connection established with TURN support:', conn.peer);
+    
+    // Monitor connection quality
+    monitorConnectionQuality(conn);
+  });
+};
+
+// 4. TURN server connectivity test
+const testTURNConnectivity = async () => {
+  console.log('🧪 Testing TURN server connectivity...');
+  
+  try {
+    const pc = new RTCPeerConnection({
+      iceServers: getICEServers()
+    });
+    
+    let turnServerWorking = false;
+    let stunServerWorking = false;
+    
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        const candidate = event.candidate.candidate;
+        console.log('ICE Candidate:', candidate);
+        
+        if (candidate.includes('typ relay')) {
+          turnServerWorking = true;
+          console.log('✅ TURN server is working!');
+        }
+        
+        if (candidate.includes('typ srflx')) {
+          stunServerWorking = true;
+          console.log('✅ STUN server is working!');
+        }
+      } else {
+        // ICE gathering complete
+        console.log('🏁 ICE gathering complete');
+        console.log(`TURN working: ${turnServerWorking}, STUN working: ${stunServerWorking}`);
+        
+        if (!turnServerWorking && !stunServerWorking) {
+          console.warn('⚠️ No TURN or STUN servers are reachable');
+          setCallError('Network connectivity issues detected. Calls may not work properly.');
+          setShowCallError(true);
+        }
+        
+        pc.close();
+      }
+    };
+    
+    // Create a dummy data channel to trigger ICE gathering
+    pc.createDataChannel('test');
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    
+  } catch (error) {
+    console.error('❌ TURN connectivity test failed:', error);
+  }
+};
+
+// 5. Enhanced call quality monitoring
+const monitorConnectionQuality = (connection) => {
+  if (!connection.peerConnection) return;
+  
+  const pc = connection.peerConnection;
+  
+  // Monitor connection stats every 5 seconds
+  const statsInterval = setInterval(async () => {
+    try {
+      const stats = await pc.getStats();
+      let bytesReceived = 0;
+      let bytesSent = 0;
+      let packetsLost = 0;
+      let roundTripTime = 0;
+      
+      stats.forEach((report) => {
+        if (report.type === 'inbound-rtp') {
+          bytesReceived += report.bytesReceived || 0;
+          packetsLost += report.packetsLost || 0;
+        }
+        
+        if (report.type === 'outbound-rtp') {
+          bytesSent += report.bytesSent || 0;
+        }
+        
+        if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+          roundTripTime = report.currentRoundTripTime || 0;
+        }
+      });
+      
+      // Log connection quality metrics
+      console.log('📊 Connection Quality:', {
+        bytesReceived,
+        bytesSent,
+        packetsLost,
+        roundTripTime: Math.round(roundTripTime * 1000) + 'ms'
+      });
+      
+      // Show warning for poor connection quality
+      if (packetsLost > 50 || roundTripTime > 0.5) {
+        console.warn('⚠️ Poor connection quality detected');
+      }
+      
+    } catch (error) {
+      console.error('Error getting connection stats:', error);
+    }
+  }, 5000);
+  
+  // Clean up interval when connection ends
+  connection.on('close', () => {
+    clearInterval(statsInterval);
+  });
+};
+
+// 6. Enhanced startCall with better error handling for TURN
+const startCall = async (type) => {
+  if (!peer || !selectedUser || isInitiatingCall) {
+    setCallError('Connection not ready. Please try again.');
+    setShowCallError(true);
+    return;
+  }
+
+  try {
+    setIsInitiatingCall(true);
+    setCallType(type);
+    setIsInCall(true);
+    setShowCallModal(true);
+    setCallStatus('calling');
+    setCallError(null);
+    setIsRinging(true);
+
+    console.log(`🚀 Starting ${type} call with TURN support to:`, selectedUser);
+
+    // Start playing ringtone for outgoing call
+    if (ringtone) {
+      ringtone.currentTime = 0;
+      ringtone.play().catch(console.error);
+    }
+
+    // Get media with proper constraints
+    const constraints = {
+      video: type === 'video' ? {
+        width: { ideal: 1280, max: 1920 },
+        height: { ideal: 720, max: 1080 },
+        facingMode: 'user'
+      } : false,
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        sampleRate: 44100
+      }
+    };
+
+    console.log('🎥 Getting user media with enhanced constraints:', constraints);
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    setLocalStream(stream);
+
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = stream;
+    }
+
+    // Enhanced call metadata
+    const callMetadata = {
+      type: type,
+      timestamp: Date.now(),
+      caller: userData.userName,
+      turnEnabled: true,
+      quality: type === 'video' ? 'HD' : 'High'
+    };
+
+    setCallMetadata(callMetadata);
+
+    const recipientEmail = selectedUser.toLowerCase() + '@demo.com';
+    const recipientPeerId = convertEmailToPeerId(recipientEmail);
+    
+    console.log('📞 Call details with TURN:', {
+      selectedUser,
+      recipientEmail,
+      recipientPeerId,
+      myPeerId: peer.id,
+      callType: type,
+      turnEnabled: true
+    });
+    
+    setCallStatus('connecting');
+    
+    // Create the call with enhanced metadata
+    const call = peer.call(recipientPeerId, stream, {
+      metadata: callMetadata
+    });
+    
+    if (!call) {
+      throw new Error('Failed to initiate call with TURN support');
+    }
+    
+    setCurrentCall(call);
+
+    // Monitor call connection quality
+    if (call.peerConnection) {
+      monitorConnectionQuality({ peerConnection: call.peerConnection });
+    }
+
+    // Enhanced timeout handling
+    const timeout = setTimeout(() => {
+      if (!isCallConnected) {
+        console.log('⏰ Call timeout - recipient not available');
+        handleCallTimeout();
+      }
+    }, 30000);
+
+    setCallTimeout(timeout);
+
+    // Handle remote stream with quality monitoring
+    call.on('stream', (remoteStream) => {
+      console.log('📡 Received remote stream with TURN support');
+      handleRemoteStreamReceived(remoteStream);
+      
+      // Log stream quality
+      const videoTracks = remoteStream.getVideoTracks();
+      const audioTracks = remoteStream.getAudioTracks();
+      console.log('📺 Remote stream quality:', {
+        video: videoTracks.length > 0 ? videoTracks[0].getSettings() : 'Audio only',
+        audio: audioTracks.length > 0 ? audioTracks[0].getSettings() : 'No audio'
+      });
+    });
+
+    // Handle call close
+    call.on('close', () => {
+      console.log('📴 Call closed by remote peer');
+      handleCallClosed();
+    });
+
+    // Enhanced error handling with TURN-specific messages
+    call.on('error', (error) => {
+      console.error('❌ Call error with TURN support:', error);
+      handleCallError(error);
+    });
+
+  } catch (error) {
+    console.error('❌ Error starting call with TURN:', error);
+    handleCallInitError(error);
+  } finally {
+    setIsInitiatingCall(false);
+  }
+};
+
+// 7. Network quality indicator component
+const NetworkQualityIndicator = () => {
+  const [networkQuality, setNetworkQuality] = useState('good');
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    if (isCallConnected && currentCall?.peerConnection) {
+      const pc = currentCall.peerConnection;
+      
+      const checkNetworkQuality = async () => {
+        try {
+          const stats = await pc.getStats();
+          let packetsLost = 0;
+          let packetsReceived = 0;
+          let roundTripTime = 0;
+
+          stats.forEach((report) => {
+            if (report.type === 'inbound-rtp') {
+              packetsLost += report.packetsLost || 0;
+              packetsReceived += report.packetsReceived || 0;
+            }
+            if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+              roundTripTime = report.currentRoundTripTime || 0;
+            }
+          });
+
+          const lossRate = packetsReceived > 0 ? (packetsLost / packetsReceived) * 100 : 0;
+          const rtt = roundTripTime * 1000; // Convert to ms
+
+          let quality = 'good';
+          if (lossRate > 5 || rtt > 300) {
+            quality = 'poor';
+          } else if (lossRate > 2 || rtt > 150) {
+            quality = 'fair';
+          }
+
+          setNetworkQuality(quality);
+          setIsVisible(quality !== 'good');
+
+        } catch (error) {
+          console.error('Error checking network quality:', error);
+        }
+      };
+
+      const interval = setInterval(checkNetworkQuality, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [isCallConnected, currentCall]);
+
+  if (!isVisible) return null;
+
+  const getQualityColor = () => {
+    switch (networkQuality) {
+      case 'poor': return 'bg-red-500';
+      case 'fair': return 'bg-yellow-500';
+      default: return 'bg-green-500';
+    }
+  };
+
+  return (
+    <div className={`absolute top-16 left-4 px-3 py-1 rounded-full text-white text-sm ${getQualityColor()} z-20`}>
+      📶 Network: {networkQuality}
+    </div>
+  );
+};
+
+// 8. Usage instructions and setup verification
+const setupVerification = () => {
+  console.log('🔧 WebRTC Setup Verification:');
+  console.log('1. Metered TURN servers configured:', METERED_TURN_CONFIG.urls.length > 0);
+  console.log('2. Username set:', !!METERED_TURN_CONFIG.username && METERED_TURN_CONFIG.username !== 'YOUR_METERED_USERNAME');
+  console.log('3. Credential set:', !!METERED_TURN_CONFIG.credential && METERED_TURN_CONFIG.credential !== 'YOUR_METERED_CREDENTIAL');
+  
+  if (METERED_TURN_CONFIG.username === 'YOUR_METERED_USERNAME') {
+    console.warn('⚠️ Please replace YOUR_METERED_USERNAME with your actual Metered username');
+  }
+  
+  if (METERED_TURN_CONFIG.credential === 'YOUR_METERED_CREDENTIAL') {
+    console.warn('⚠️ Please replace YOUR_METERED_CREDENTIAL with your actual Metered credential');
+  }
+};
+
+// Call setup verification on initialization
+setupVerification();
+
+
+// 10. Add NetworkQualityIndicator to your CallModal component
+// Add this inside your CallModal component's JSX:
+// {isCallConnected && <NetworkQualityIndicator />}
   useEffect(() => {
     // Create ringtone audio for outgoing calls
     const outgoingRingtone = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEUBT2a2u3CcOr/'); // Short beep sound
@@ -138,114 +594,6 @@ const convertPeerIdToEmail = (peerId) => {
   return peerId + '@demo.com';
 };
 
-// 3. Enhanced startCall function with proper call type handling
-const startCall = async (type) => {
-  if (!peer || !selectedUser || isInitiatingCall) {
-    setCallError('Connection not ready. Please try again.');
-    setShowCallError(true);
-    return;
-  }
-
-  try {
-    setIsInitiatingCall(true);
-    setCallType(type);
-    setIsInCall(true);
-    setShowCallModal(true);
-    setCallStatus('calling');
-    setCallError(null);
-    setIsRinging(true);
-
-    console.log(`Starting ${type} call to:`, selectedUser);
-
-    // Start playing ringtone for outgoing call
-    if (ringtone) {
-      ringtone.currentTime = 0;
-      ringtone.play().catch(console.error);
-    }
-
-    // Get media with proper constraints based on call type
-    const constraints = {
-      video: type === 'video',
-      audio: true
-    };
-
-    console.log('Getting user media with constraints:', constraints);
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    setLocalStream(stream);
-
-    if (localVideoRef.current) {
-      localVideoRef.current.srcObject = stream;
-    }
-
-    // Create call metadata to send call type info
-    const callMetadata = {
-      type: type,
-      timestamp: Date.now(),
-      caller: userData.userName
-    };
-
-    // Store metadata for this call
-    setCallMetadata(callMetadata);
-
-    const recipientEmail = selectedUser.toLowerCase() + '@demo.com';
-    const recipientPeerId = convertEmailToPeerId(recipientEmail);
-    
-    console.log('Call details:', {
-      selectedUser,
-      recipientEmail,
-      recipientPeerId,
-      myPeerId: peer.id,
-      callType: type
-    });
-    
-    setCallStatus('connecting');
-    
-    // Create the call with metadata
-    const call = peer.call(recipientPeerId, stream, {
-      metadata: callMetadata // Pass call type info
-    });
-    
-    if (!call) {
-      throw new Error('Failed to initiate call');
-    }
-    
-    setCurrentCall(call);
-
-    // Enhanced timeout handling
-    const timeout = setTimeout(() => {
-      if (!isCallConnected) {
-        console.log('Call timeout - recipient not available');
-        handleCallTimeout();
-      }
-    }, 30000);
-
-    setCallTimeout(timeout);
-
-    // Handle remote stream
-    call.on('stream', (remoteStream) => {
-      console.log('Received remote stream');
-      handleRemoteStreamReceived(remoteStream);
-    });
-
-    // Handle call close
-    call.on('close', () => {
-      console.log('Call closed by remote peer');
-      handleCallClosed();
-    });
-
-    // Enhanced error handling
-    call.on('error', (error) => {
-      console.error('Call error:', error);
-      handleCallError(error);
-    });
-
-  } catch (error) {
-    console.error('Error starting call:', error);
-    handleCallInitError(error);
-  } finally {
-    setIsInitiatingCall(false);
-  }
-};
 
 
 
@@ -554,74 +902,6 @@ const endCall = () => {
   console.log('Call ended and cleaned up completely');
 };
 
-// 9. Enhanced peer initialization with better error handling
-const initializePeer = () => {
-  if (!userData?.userEmail) {
-    console.error('User email not available for peer initialization');
-    return;
-  }
-  
-  const peerId = convertEmailToPeerId(userData.userEmail.toLowerCase());
-  console.log('Initializing peer:', { userEmail: userData.userEmail, peerId });
-  
-  // Destroy existing peer
-  if (peer && !peer.destroyed) {
-    peer.destroy();
-  }
-  
-  const peerInstance = new window.Peer(peerId, {
-    host: '0.peerjs.com',
-    port: 443,
-    path: '/',
-    secure: true,
-    debug: 1, // Reduced debug level for cleaner logs
-    config: {
-      'iceServers': [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:global.stun.twilio.com:3478' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-      ]
-    }
-  });
-
-  peerInstance.on('open', (id) => {
-    console.log('✅ Peer connected successfully with ID:', id);
-    setPeer(peerInstance);
-  });
-
-  peerInstance.on('call', handleIncomingCall);
-
-  peerInstance.on('error', (error) => {
-    console.error('❌ Peer error:', error);
-    
-    if (error.type === 'peer-destroyed') {
-      console.log('🔄 Peer destroyed, reconnecting...');
-      setTimeout(() => {
-        initializePeer();
-      }, 2000);
-    } else {
-      let errorMessage = 'Connection error. Please refresh and try again.';
-      if (error.type === 'unavailable-id') {
-        errorMessage = 'Your session has expired. Please refresh the page.';
-      }
-      setCallError(errorMessage);
-      setShowCallError(true);
-    }
-  });
-
-  peerInstance.on('disconnected', () => {
-    console.log('⚠️ Peer disconnected, attempting to reconnect...');
-    setTimeout(() => {
-      if (!peerInstance.destroyed) {
-        peerInstance.reconnect();
-      }
-    }, 1000);
-  });
-
-  peerInstance.on('connection', (conn) => {
-    console.log('🔗 Data connection established with:', conn.peer);
-  });
-};
 
 // 10. Enhanced UI components with proper call type display
 

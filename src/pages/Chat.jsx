@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { format, isToday, isYesterday } from "date-fns";
 import { Input } from "@/components/ui/input";
@@ -91,10 +92,10 @@ const Chat = () => {
   const [isRinging, setIsRinging] = useState(false);
   const [ringtone, setRingtone] = useState(null);
   const [callTimeout, setCallTimeout] = useState(null);
-  const [callMetadata, setCallMetadata] = useState(null); // Store call type info
-  const [isInitiatingCall, setIsInitiatingCall] = useState(false);
-  const [callHistory, setCallHistory] = useState([]);
-
+// 1. Updated state management for better call type detection
+const [callMetadata, setCallMetadata] = useState(null); // Store call type info
+const [isInitiatingCall, setIsInitiatingCall] = useState(false);
+const [callHistory, setCallHistory] = useState([]);
   const chatEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const imageInputRef = useRef(null);
@@ -107,242 +108,35 @@ const Chat = () => {
     fetchUsersAndMessages();
     initializePeer();
   }, []);
-// Enhanced WebRTC calling system with Metered TURN servers
 
-// 1. METERED TURN SERVER CONFIGURATION
-// Replace these with your actual Metered credentials
-const METERED_TURN_CONFIG = {
-  // Your Metered TURN server URLs
-  urls: [
-    'turn:a.relay.metered.ca:80',
-    'turn:a.relay.metered.ca:80?transport=tcp',
-    'turn:a.relay.metered.ca:443',
-    'turn:a.relay.metered.ca:443?transport=tcp'
-  ],
-  // Your Metered username (found in dashboard)
-  username: 'istreams_erp.metered.live', // Replace with your actual username
-  // Your Metered credential/password (found in dashboard)
-  credential: 'hsVFk7-VIpczMpZPnaMhy_kc4aGLC1rN90GDKO5r2rag85UM' // Replace with your actual credential
-};
-
-// 2. Enhanced ICE servers configuration with Metered TURN
-const getICEServers = () => {
-  return [
-    // Google STUN servers (free, for basic connectivity)
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' },
+  useEffect(() => {
+    // Create ringtone audio for outgoing calls
+    const outgoingRingtone = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEUBT2a2u3CcOr/'); // Short beep sound
+    outgoingRingtone.loop = true;
+    setRingtone(outgoingRingtone);
     
-    // Metered TURN servers (premium, for NAT traversal)
-    METERED_TURN_CONFIG,
-    
-    // Additional TURN servers for redundancy
-    {
-      urls: [
-        'turn:b.relay.metered.ca:80',
-        'turn:b.relay.metered.ca:80?transport=tcp',
-        'turn:b.relay.metered.ca:443',
-        'turn:b.relay.metered.ca:443?transport=tcp'
-      ],
-      username: METERED_TURN_CONFIG.username,
-      credential: METERED_TURN_CONFIG.credential
-    }
-  ];
-};
-
-// 3. Enhanced peer initialization with Metered TURN
-const initializePeer = () => {
-  if (!userData?.userEmail) {
-    console.error('User email not available for peer initialization');
-    return;
-  }
-  
-  const peerId = convertEmailToPeerId(userData.userEmail.toLowerCase());
-  console.log('Initializing peer with Metered TURN:', { userEmail: userData.userEmail, peerId });
-  
-  // Destroy existing peer
-  if (peer && !peer.destroyed) {
-    peer.destroy();
-  }
-  
-  const peerInstance = new window.Peer(peerId, {
-    host: '0.peerjs.com',
-    port: 443,
-    path: '/',
-    secure: true,
-    debug: 1,
-    config: {
-      // Enhanced ICE servers with Metered TURN
-      iceServers: getICEServers(),
-      
-      // Additional WebRTC configuration for better connectivity
-      iceCandidatePoolSize: 10,
-      iceTransportPolicy: 'all', // Use both STUN and TURN
-      bundlePolicy: 'balanced',
-      rtcpMuxPolicy: 'require',
-      
-      // Enable continuous gathering for better connection reliability
-      continualGatheringPolicy: 'gather_continually'
-    }
-  });
-
-  // Enhanced connection monitoring
-  peerInstance.on('open', (id) => {
-    console.log('✅ Peer connected successfully with Metered TURN support. ID:', id);
-    setPeer(peerInstance);
-    
-    // Test TURN server connectivity
-    testTURNConnectivity();
-  });
-
-  peerInstance.on('call', handleIncomingCall);
-
-  peerInstance.on('error', (error) => {
-    console.error('❌ Peer error:', error);
-    
-    if (error.type === 'peer-destroyed') {
-      console.log('🔄 Peer destroyed, reconnecting with TURN...');
-      setTimeout(() => {
-        initializePeer();
-      }, 2000);
-    } else {
-      let errorMessage = 'Connection error. Please refresh and try again.';
-      if (error.type === 'unavailable-id') {
-        errorMessage = 'Your session has expired. Please refresh the page.';
-      } else if (error.type === 'network') {
-        errorMessage = 'Network connection failed. Checking TURN server connectivity...';
-        testTURNConnectivity();
-      }
-      setCallError(errorMessage);
-      setShowCallError(true);
-    }
-  });
-
-  peerInstance.on('disconnected', () => {
-    console.log('⚠️ Peer disconnected, attempting to reconnect with TURN support...');
-    setTimeout(() => {
-      if (!peerInstance.destroyed) {
-        peerInstance.reconnect();
-      }
-    }, 1000);
-  });
-
-  peerInstance.on('connection', (conn) => {
-    console.log('🔗 Data connection established with TURN support:', conn.peer);
-    
-    // Monitor connection quality
-    monitorConnectionQuality(conn);
-  });
-};
-
-// 4. TURN server connectivity test
-const testTURNConnectivity = async () => {
-  console.log('🧪 Testing TURN server connectivity...');
-  
-  try {
-    const pc = new RTCPeerConnection({
-      iceServers: getICEServers()
-    });
-    
-    let turnServerWorking = false;
-    let stunServerWorking = false;
-    
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        const candidate = event.candidate.candidate;
-        console.log('ICE Candidate:', candidate);
-        
-        if (candidate.includes('typ relay')) {
-          turnServerWorking = true;
-          console.log('✅ TURN server is working!');
-        }
-        
-        if (candidate.includes('typ srflx')) {
-          stunServerWorking = true;
-          console.log('✅ STUN server is working!');
-        }
-      } else {
-        // ICE gathering complete
-        console.log('🏁 ICE gathering complete');
-        console.log(`TURN working: ${turnServerWorking}, STUN working: ${stunServerWorking}`);
-        
-        if (!turnServerWorking && !stunServerWorking) {
-          console.warn('⚠️ No TURN or STUN servers are reachable');
-          setCallError('Network connectivity issues detected. Calls may not work properly.');
-          setShowCallError(true);
-        }
-        
-        pc.close();
+    return () => {
+      if (outgoingRingtone) {
+        outgoingRingtone.pause();
+        outgoingRingtone.currentTime = 0;
       }
     };
-    
-    // Create a dummy data channel to trigger ICE gathering
-    pc.createDataChannel('test');
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    
-  } catch (error) {
-    console.error('❌ TURN connectivity test failed:', error);
+  }, []);
+
+// 2. Enhanced convertEmailToPeerId with better validation
+const convertEmailToPeerId = (email) => {
+  if (!email) return null;
+  return email.replace(/[@.]/g, '_').toLowerCase();
+};
+
+const convertPeerIdToEmail = (peerId) => {
+  if (!peerId || !peerId.includes('_')) return peerId + '@demo.com';
+  const parts = peerId.split('_');
+  if (parts.length >= 2) {
+    return parts[0] + '@' + parts.slice(1).join('.');
   }
+  return peerId + '@demo.com';
 };
-
-// 5. Enhanced call quality monitoring
-const monitorConnectionQuality = (connection) => {
-  if (!connection.peerConnection) return;
-  
-  const pc = connection.peerConnection;
-  
-  // Monitor connection stats every 5 seconds
-  const statsInterval = setInterval(async () => {
-    try {
-      const stats = await pc.getStats();
-      let bytesReceived = 0;
-      let bytesSent = 0;
-      let packetsLost = 0;
-      let roundTripTime = 0;
-      
-      stats.forEach((report) => {
-        if (report.type === 'inbound-rtp') {
-          bytesReceived += report.bytesReceived || 0;
-          packetsLost += report.packetsLost || 0;
-        }
-        
-        if (report.type === 'outbound-rtp') {
-          bytesSent += report.bytesSent || 0;
-        }
-        
-        if (report.type === 'candidate-pair' && report.state === 'succeeded') {
-          roundTripTime = report.currentRoundTripTime || 0;
-        }
-      });
-      
-      // Log connection quality metrics
-      console.log('📊 Connection Quality:', {
-        bytesReceived,
-        bytesSent,
-        packetsLost,
-        roundTripTime: Math.round(roundTripTime * 1000) + 'ms'
-      });
-      
-      // Show warning for poor connection quality
-      if (packetsLost > 50 || roundTripTime > 0.5) {
-        console.warn('⚠️ Poor connection quality detected');
-      }
-      
-    } catch (error) {
-      console.error('Error getting connection stats:', error);
-    }
-  }, 5000);
-  
-  // Clean up interval when connection ends
-  connection.on('close', () => {
-    clearInterval(statsInterval);
-  });
-};
-
-// 6. Enhanced startCall with better error handling for TURN
 const startCall = async (type) => {
   if (!peer || !selectedUser || isInitiatingCall) {
     setCallError('Connection not ready. Please try again.');
@@ -359,7 +153,7 @@ const startCall = async (type) => {
     setCallError(null);
     setIsRinging(true);
 
-    console.log(`🚀 Starting ${type} call with TURN support to:`, selectedUser);
+    console.log(`Starting ${type} call to:`, selectedUser);
 
     // Start playing ringtone for outgoing call
     if (ringtone) {
@@ -367,22 +161,13 @@ const startCall = async (type) => {
       ringtone.play().catch(console.error);
     }
 
-    // Get media with proper constraints
+    // Get media with proper constraints based on call type
     const constraints = {
-      video: type === 'video' ? {
-        width: { ideal: 1280, max: 1920 },
-        height: { ideal: 720, max: 1080 },
-        facingMode: 'user'
-      } : false,
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-        sampleRate: 44100
-      }
+      video: type === 'video',
+      audio: true
     };
 
-    console.log('🎥 Getting user media with enhanced constraints:', constraints);
+    console.log('Getting user media with constraints:', constraints);
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     setLocalStream(stream);
 
@@ -390,219 +175,153 @@ const startCall = async (type) => {
       localVideoRef.current.srcObject = stream;
     }
 
-    // Enhanced call metadata
+    // ENHANCED: Create call metadata with explicit call type info
     const callMetadata = {
-      type: type,
+      type: type, // 'audio' or 'video'
       timestamp: Date.now(),
       caller: userData.userName,
-      turnEnabled: true,
-      quality: type === 'video' ? 'HD' : 'High'
+      callerEmail: userData.userEmail // Add caller email for better identification
     };
 
+    // Store metadata for this call
     setCallMetadata(callMetadata);
 
     const recipientEmail = selectedUser.toLowerCase() + '@demo.com';
     const recipientPeerId = convertEmailToPeerId(recipientEmail);
     
-    console.log('📞 Call details with TURN:', {
+    console.log('Call details:', {
       selectedUser,
       recipientEmail,
       recipientPeerId,
       myPeerId: peer.id,
       callType: type,
-      turnEnabled: true
+      metadata: callMetadata
     });
     
     setCallStatus('connecting');
     
     // Create the call with enhanced metadata
     const call = peer.call(recipientPeerId, stream, {
-      metadata: callMetadata
+      metadata: callMetadata // This will be received by the incoming call handler
     });
     
     if (!call) {
-      throw new Error('Failed to initiate call with TURN support');
+      throw new Error('Failed to initiate call');
     }
     
     setCurrentCall(call);
 
-    // Monitor call connection quality
-    if (call.peerConnection) {
-      monitorConnectionQuality({ peerConnection: call.peerConnection });
-    }
-
     // Enhanced timeout handling
     const timeout = setTimeout(() => {
       if (!isCallConnected) {
-        console.log('⏰ Call timeout - recipient not available');
+        console.log('Call timeout - recipient not available');
         handleCallTimeout();
       }
     }, 30000);
 
     setCallTimeout(timeout);
 
-    // Handle remote stream with quality monitoring
+    // Handle remote stream
     call.on('stream', (remoteStream) => {
-      console.log('📡 Received remote stream with TURN support');
+      console.log('Received remote stream');
       handleRemoteStreamReceived(remoteStream);
-      
-      // Log stream quality
-      const videoTracks = remoteStream.getVideoTracks();
-      const audioTracks = remoteStream.getAudioTracks();
-      console.log('📺 Remote stream quality:', {
-        video: videoTracks.length > 0 ? videoTracks[0].getSettings() : 'Audio only',
-        audio: audioTracks.length > 0 ? audioTracks[0].getSettings() : 'No audio'
-      });
     });
 
     // Handle call close
     call.on('close', () => {
-      console.log('📴 Call closed by remote peer');
+      console.log('Call closed by remote peer');
       handleCallClosed();
     });
 
-    // Enhanced error handling with TURN-specific messages
+    // Enhanced error handling
     call.on('error', (error) => {
-      console.error('❌ Call error with TURN support:', error);
+      console.error('Call error:', error);
       handleCallError(error);
     });
 
   } catch (error) {
-    console.error('❌ Error starting call with TURN:', error);
+    console.error('Error starting call:', error);
     handleCallInitError(error);
   } finally {
     setIsInitiatingCall(false);
   }
 };
 
-// 7. Network quality indicator component
-const NetworkQualityIndicator = () => {
-  const [networkQuality, setNetworkQuality] = useState('good');
-  const [isVisible, setIsVisible] = useState(false);
-
-  useEffect(() => {
-    if (isCallConnected && currentCall?.peerConnection) {
-      const pc = currentCall.peerConnection;
-      
-      const checkNetworkQuality = async () => {
-        try {
-          const stats = await pc.getStats();
-          let packetsLost = 0;
-          let packetsReceived = 0;
-          let roundTripTime = 0;
-
-          stats.forEach((report) => {
-            if (report.type === 'inbound-rtp') {
-              packetsLost += report.packetsLost || 0;
-              packetsReceived += report.packetsReceived || 0;
-            }
-            if (report.type === 'candidate-pair' && report.state === 'succeeded') {
-              roundTripTime = report.currentRoundTripTime || 0;
-            }
-          });
-
-          const lossRate = packetsReceived > 0 ? (packetsLost / packetsReceived) * 100 : 0;
-          const rtt = roundTripTime * 1000; // Convert to ms
-
-          let quality = 'good';
-          if (lossRate > 5 || rtt > 300) {
-            quality = 'poor';
-          } else if (lossRate > 2 || rtt > 150) {
-            quality = 'fair';
-          }
-
-          setNetworkQuality(quality);
-          setIsVisible(quality !== 'good');
-
-        } catch (error) {
-          console.error('Error checking network quality:', error);
-        }
-      };
-
-      const interval = setInterval(checkNetworkQuality, 3000);
-      return () => clearInterval(interval);
-    }
-  }, [isCallConnected, currentCall]);
-
-  if (!isVisible) return null;
-
-  const getQualityColor = () => {
-    switch (networkQuality) {
-      case 'poor': return 'bg-red-500';
-      case 'fair': return 'bg-yellow-500';
-      default: return 'bg-green-500';
-    }
-  };
-
-  return (
-    <div className={`absolute top-16 left-4 px-3 py-1 rounded-full text-white text-sm ${getQualityColor()} z-20`}>
-      📶 Network: {networkQuality}
-    </div>
+// 2. Update handleIncomingCall to properly detect call type from metadata
+const handleIncomingCall = (call) => {
+  console.log('Incoming call from peer:', call.peer);
+  console.log('Call metadata:', call.metadata); // This will contain the call type
+  
+  // Fix: Better peer ID to username conversion
+  let callerUsername;
+  if (call.peer.includes('_')) {
+    const callerEmail = convertPeerIdToEmail(call.peer);
+    console.log('Caller email:', callerEmail);
+    callerUsername = callerEmail.replace('@demo.com', '');
+  } else {
+    callerUsername = call.peer;
+  }
+  
+  console.log('Caller username:', callerUsername);
+  
+  const callerUser = users.find(user => 
+    user.user_name.toLowerCase() === callerUsername.toLowerCase()
   );
-};
-
-// 8. Usage instructions and setup verification
-const setupVerification = () => {
-  console.log('🔧 WebRTC Setup Verification:');
-  console.log('1. Metered TURN servers configured:', METERED_TURN_CONFIG.urls.length > 0);
-  console.log('2. Username set:', !!METERED_TURN_CONFIG.username && METERED_TURN_CONFIG.username !== 'YOUR_METERED_USERNAME');
-  console.log('3. Credential set:', !!METERED_TURN_CONFIG.credential && METERED_TURN_CONFIG.credential !== 'YOUR_METERED_CREDENTIAL');
+  const callerName = callerUser ? callerUser.user_name : callerUsername;
   
-  if (METERED_TURN_CONFIG.username === 'YOUR_METERED_USERNAME') {
-    console.warn('⚠️ Please replace YOUR_METERED_USERNAME with your actual Metered username');
+  // ENHANCED: Detect call type from metadata first, then from stream as fallback
+  let detectedCallType = 'audio'; // Default fallback
+  
+  if (call.metadata && call.metadata.type) {
+    // Primary method: Use metadata passed from caller
+    detectedCallType = call.metadata.type;
+    console.log('Call type detected from metadata:', detectedCallType);
   }
   
-  if (METERED_TURN_CONFIG.credential === 'YOUR_METERED_CREDENTIAL') {
-    console.warn('⚠️ Please replace YOUR_METERED_CREDENTIAL with your actual Metered credential');
-  }
-};
-
-// Call setup verification on initialization
-setupVerification();
-
-
-// 10. Add NetworkQualityIndicator to your CallModal component
-// Add this inside your CallModal component's JSX:
-// {isCallConnected && <NetworkQualityIndicator />}
-  useEffect(() => {
-    // Create ringtone audio for outgoing calls
-    const outgoingRingtone = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEUBT2a2u3CcOr/'); // Short beep sound
-    outgoingRingtone.loop = true;
-    setRingtone(outgoingRingtone);
+  setIncomingCallType(detectedCallType);
+  
+  // Fallback: Also check stream when it arrives (in case metadata is missing)
+  call.on('stream', (remoteStream) => {
+    const videoTracks = remoteStream.getVideoTracks();
+    const streamBasedType = videoTracks.length > 0 ? 'video' : 'audio';
     
-    return () => {
-      if (outgoingRingtone) {
-        outgoingRingtone.pause();
-        outgoingRingtone.currentTime = 0;
-      }
-    };
-  }, []);
-
-
-// 2. Enhanced convertEmailToPeerId with better validation
-  const convertEmailToPeerId = (email) => {
-    if (!email) return null;
-    return email.replace(/[@.]/g, '_').toLowerCase();
-  };
-
-const convertPeerIdToEmail = (peerId) => {
-  if (!peerId || !peerId.includes('_')) return peerId + '@demo.com';
-  const parts = peerId.split('_');
-  if (parts.length >= 2) {
-    return parts[0] + '@' + parts.slice(1).join('.');
+    // Only update if we didn't get metadata or if stream contradicts metadata
+    if (!call.metadata || !call.metadata.type) {
+      console.log('Updating call type based on stream:', streamBasedType);
+      setIncomingCallType(streamBasedType);
+    } else {
+      console.log('Stream-based type:', streamBasedType, 'matches metadata type:', call.metadata.type);
+    }
+  });
+  
+  call.callerUsername = callerName;
+  setIncomingCall(call);
+  setShowCallModal(true);
+  setCallStatus('incoming');
+  
+  // Play incoming call ringtone
+  if (ringtone) {
+    ringtone.currentTime = 0;
+    ringtone.play().catch(console.error);
   }
-  return peerId + '@demo.com';
+  
+  // ENHANCED: Auto-reject after 30 seconds with proper cleanup
+  const autoRejectTimeout = setTimeout(() => {
+    console.log('Auto-rejecting call after 30 seconds');
+    rejectCall();
+  }, 30000);
+  
+  // Store timeout reference for cleanup
+  call.autoRejectTimeout = autoRejectTimeout;
 };
 
-
-
-
-// 5. Enhanced answerCall function with proper media constraints
+// 3. Update answerCall to use the detected call type
 const answerCall = async () => {
   if (!incomingCall) return;
 
   try {
-    console.log(`Answering ${incomingCallType} call`);
+    const callTypeToUse = incomingCallType || 'audio'; // Use detected type or fallback to audio
+    console.log(`Answering ${callTypeToUse} call`);
     
     // Stop ringtone
     if (ringtone) {
@@ -615,20 +334,20 @@ const answerCall = async () => {
       clearTimeout(incomingCall.autoRejectTimeout);
     }
 
-    // Fix: Get media with proper constraints based on INCOMING call type
+    // Get media with proper constraints based on detected call type
     const constraints = {
-      video: incomingCallType === 'video',
+      video: callTypeToUse === 'video',
       audio: true
     };
 
     console.log('Answering with constraints:', constraints);
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     setLocalStream(stream);
-    setCallType(incomingCallType); // Use the detected incoming call type
+    setCallType(callTypeToUse); // Set the call type based on what was detected
     setIsInCall(true);
     setCallStatus('connecting');
 
-    if (localVideoRef.current && incomingCallType === 'video') {
+    if (localVideoRef.current) {
       localVideoRef.current.srcObject = stream;
     }
 
@@ -661,6 +380,37 @@ const answerCall = async () => {
     rejectCall();
   }
 };
+
+// 4. Update the rejectCall function to handle timeout cleanup
+const rejectCall = () => {
+  console.log('Rejecting call');
+  
+  if (ringtone) {
+    ringtone.pause();
+    ringtone.currentTime = 0;
+  }
+  
+  if (incomingCall) {
+    // Clear auto-reject timeout
+    if (incomingCall.autoRejectTimeout) {
+      clearTimeout(incomingCall.autoRejectTimeout);
+    }
+    
+    // Send rejection signal
+    try {
+      incomingCall.close();
+    } catch (error) {
+      console.error('Error closing incoming call:', error);
+    }
+    setIncomingCall(null);
+  }
+  
+  setIncomingCallType(null);
+  setShowCallModal(false);
+  setCallStatus('');
+  setCallType(null);
+};
+
 
 
 // 6. Helper functions for better error handling
@@ -802,35 +552,6 @@ const handleCallInitError = (error) => {
   endCall();
 };
 
-// 7. Enhanced rejectCall function
-const rejectCall = () => {
-  console.log('Rejecting call');
-  
-  if (ringtone) {
-    ringtone.pause();
-    ringtone.currentTime = 0;
-  }
-  
-  if (incomingCall) {
-    // Clear auto-reject timeout
-    if (incomingCall.autoRejectTimeout) {
-      clearTimeout(incomingCall.autoRejectTimeout);
-    }
-    
-    // Send rejection signal
-    try {
-      incomingCall.close();
-    } catch (error) {
-      console.error('Error closing incoming call:', error);
-    }
-    setIncomingCall(null);
-  }
-  
-  setIncomingCallType(null);
-  setShowCallModal(false);
-  setCallStatus('');
-  setCallType(null);
-};
 
 // 8. Enhanced endCall function with better cleanup
 const endCall = () => {
@@ -902,6 +623,74 @@ const endCall = () => {
   console.log('Call ended and cleaned up completely');
 };
 
+// 9. Enhanced peer initialization with better error handling
+const initializePeer = () => {
+  if (!userData?.userEmail) {
+    console.error('User email not available for peer initialization');
+    return;
+  }
+  
+  const peerId = convertEmailToPeerId(userData.userEmail.toLowerCase());
+  console.log('Initializing peer:', { userEmail: userData.userEmail, peerId });
+  
+  // Destroy existing peer
+  if (peer && !peer.destroyed) {
+    peer.destroy();
+  }
+  
+  const peerInstance = new window.Peer(peerId, {
+    host: '0.peerjs.com',
+    port: 443,
+    path: '/',
+    secure: true,
+    debug: 1, // Reduced debug level for cleaner logs
+    config: {
+      'iceServers': [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:global.stun.twilio.com:3478' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
+    }
+  });
+
+  peerInstance.on('open', (id) => {
+    console.log('✅ Peer connected successfully with ID:', id);
+    setPeer(peerInstance);
+  });
+
+  peerInstance.on('call', handleIncomingCall);
+
+  peerInstance.on('error', (error) => {
+    console.error('❌ Peer error:', error);
+    
+    if (error.type === 'peer-destroyed') {
+      console.log('🔄 Peer destroyed, reconnecting...');
+      setTimeout(() => {
+        initializePeer();
+      }, 2000);
+    } else {
+      let errorMessage = 'Connection error. Please refresh and try again.';
+      if (error.type === 'unavailable-id') {
+        errorMessage = 'Your session has expired. Please refresh the page.';
+      }
+      setCallError(errorMessage);
+      setShowCallError(true);
+    }
+  });
+
+  peerInstance.on('disconnected', () => {
+    console.log('⚠️ Peer disconnected, attempting to reconnect...');
+    setTimeout(() => {
+      if (!peerInstance.destroyed) {
+        peerInstance.reconnect();
+      }
+    }, 1000);
+  });
+
+  peerInstance.on('connection', (conn) => {
+    console.log('🔗 Data connection established with:', conn.peer);
+  });
+};
 
 // 10. Enhanced UI components with proper call type display
 
@@ -975,51 +764,8 @@ const CallStatusDisplay = () => {
 // Add these state variables to track call type detection
 const [incomingCallType, setIncomingCallType] = useState(null); // 'audio' or 'video'
 
-const handleIncomingCall = (call) => {
-  console.log('Incoming call from peer:', call.peer);
-  console.log('Call metadata:', call.metadata);
-  
-  // Fix: Better peer ID to username conversion
-  let callerUsername;
-  if (call.peer.includes('_')) {
-    const callerEmail = convertPeerIdToEmail(call.peer);
-    console.log('Caller email:', callerEmail);
-    callerUsername = callerEmail.replace('@demo.com', '');
-  } else {
-    callerUsername = call.peer;
-  }
-  
-  console.log('Caller username:', callerUsername);
-  
-  const callerUser = users.find(user => 
-    user.user_name.toLowerCase() === callerUsername.toLowerCase()
-  );
-  const callerName = callerUser ? callerUser.user_name : callerUsername;
-  
-  // Fix: Get call type from metadata instead of guessing
-  const detectedCallType = call.metadata?.type || 'audio'; // Default to audio if no metadata
-  setIncomingCallType(detectedCallType);
-  console.log('Detected call type from metadata:', detectedCallType);
-  
-  call.callerUsername = callerName;
-  setIncomingCall(call);
-  setShowCallModal(true);
-  setCallStatus('incoming');
-  
-  // Play incoming call ringtone
-  if (ringtone) {
-    ringtone.currentTime = 0;
-    ringtone.play().catch(console.error);
-  }
-  
-  // Auto-reject after 30 seconds
-  const autoRejectTimeout = setTimeout(() => {
-    console.log('Auto-rejecting call after timeout');
-    rejectCall();
-  }, 30000);
-  
-  call.autoRejectTimeout = autoRejectTimeout;
-};
+
+
 // 4. Fixed answerCall function 
 
 // Call Error Modal Component
@@ -1420,41 +1166,19 @@ const findActivePeerForUser = async (username) => {
 
 const AudioVideoElement = ({ stream, muted = false, className = "", isAudioOnly = false }) => {
   const videoRef = useRef(null);
-  const audioRef = useRef(null);
   
   useEffect(() => {
-    if (stream) {
-      if (isAudioOnly) {
-        // For audio-only calls, use audio element
-        if (audioRef.current) {
-          audioRef.current.srcObject = stream;
-          audioRef.current.muted = muted;
-          if (!muted) {
-            audioRef.current.volume = 1.0;
-            audioRef.current.play().catch(console.error);
-          }
-        }
-      } else {
-        // For video calls, use video element
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.muted = muted;
-        }
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.muted = muted;
+      
+      // For audio-only calls, ensure audio plays
+      if (isAudioOnly && !muted) {
+        videoRef.current.volume = 1.0;
+        videoRef.current.play().catch(console.error);
       }
     }
   }, [stream, muted, isAudioOnly]);
-
-  if (isAudioOnly) {
-    return (
-      <audio
-        ref={audioRef}
-        autoPlay
-        playsInline
-        muted={muted}
-        style={{ display: 'none' }}
-      />
-    );
-  }
 
   return (
     <video
@@ -1462,7 +1186,7 @@ const AudioVideoElement = ({ stream, muted = false, className = "", isAudioOnly 
       autoPlay
       playsInline
       muted={muted}
-      className={className}
+      className={`${className} ${isAudioOnly ? 'hidden' : ''}`}
       style={{ 
         width: '100%', 
         height: '100%',
@@ -1471,10 +1195,7 @@ const AudioVideoElement = ({ stream, muted = false, className = "", isAudioOnly 
     />
   );
 };
-// Updated CallModal component with proper audio handling
-const CallModal = () => {
-  if (!showCallModal) return null;
-
+const CallModalIncomingSection = () => {
   const getCallTypeIcon = (type) => {
     return type === 'audio' ? Phone : VideoIcon;
   };
@@ -1489,83 +1210,85 @@ const CallModal = () => {
       : 'from-blue-500 to-purple-600';
   };
 
+  // Only render if there's an incoming call and we're not in a call yet
+  if (!incomingCall || isInCall) return null;
+
+  return (
+    <div className={`p-8 text-center bg-gradient-to-br ${getGradientClass(incomingCallType)} text-white rounded-lg`}>
+      <div className="mb-6">
+        {/* Dynamic call type icon */}
+        <div className="relative mx-auto w-24 h-24 mb-6 bg-white/20 rounded-full flex items-center justify-center">
+          {React.createElement(getCallTypeIcon(incomingCallType), {
+            className: "w-12 h-12 text-white animate-pulse"
+          })}
+          <div className="absolute inset-0 rounded-full border-4 border-white opacity-30 animate-ping"></div>
+          <div className="absolute inset-0 rounded-full border-4 border-white opacity-20 animate-ping" style={{animationDelay: '0.5s'}}></div>
+        </div>
+
+        <h3 className="text-2xl font-bold mb-2">
+          {incomingCall.callerUsername || 'Unknown User'}
+        </h3>
+        <p className="text-white/80 text-lg mb-2 flex items-center justify-center">
+          {React.createElement(getCallTypeIcon(incomingCallType), {
+            className: "w-5 h-5 mr-2"
+          })}
+          Incoming {getCallTypeLabel(incomingCallType).toLowerCase()}...
+        </p>
+        
+        {/* Enhanced status display */}
+        <div className="flex justify-center items-center space-x-2 mb-4">
+          <div className="flex space-x-1">
+            <div className="w-2 h-2 bg-white rounded-full animate-bounce"></div>
+            <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+            <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+          </div>
+        </div>
+      
+        {/* Debug info (remove in production) */}
+        {incomingCall.metadata && (
+          <div className="text-white/40 text-xs mb-2">
+            Detected: {incomingCall.metadata.type || 'unknown'} call
+          </div>
+        )}
+      </div>
+      
+      {/* Action buttons */}
+      <div className="flex justify-center space-x-8">
+        <button
+          onClick={rejectCall}
+          className="bg-red-500 hover:bg-red-600 text-white rounded-full p-6 shadow-lg transform hover:scale-105 transition-all duration-200"
+          title={`Decline ${incomingCallType} call`}
+        >
+          <PhoneOff className="w-8 h-8" />
+        </button>
+        <button
+          onClick={answerCall}
+          className="bg-green-500 hover:bg-green-600 text-white rounded-full p-6 shadow-lg transform hover:scale-105 transition-all duration-200 animate-pulse"
+          title={`Answer ${incomingCallType} call`}
+        >
+          {React.createElement(getCallTypeIcon(incomingCallType), {
+            className: "w-8 h-8"
+          })}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// Updated CallModal component - cleaned up with single incoming call UI
+const CallModal = () => {
+  if (!showCallModal) return null;
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
       <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl ${
         isCallFullscreen ? 'w-full h-full' : 'w-96 max-w-lg'
       }`}>
         
-        {/* Fix: Incoming Call UI - Show correct type based on incomingCallType */}
-        {incomingCall && !isInCall && (
-          <div className={`p-8 text-center bg-gradient-to-br ${getGradientClass(incomingCallType)} text-white rounded-lg`}>
-            <div className="mb-6">
-              {/* Dynamic call type icon */}
-              <div className="relative mx-auto w-24 h-24 mb-6 bg-white/20 rounded-full flex items-center justify-center">
-                {React.createElement(getCallTypeIcon(incomingCallType), {
-                  className: "w-12 h-12 text-white animate-pulse"
-                })}
-                <div className="absolute inset-0 rounded-full border-4 border-white opacity-30 animate-ping"></div>
-                <div className="absolute inset-0 rounded-full border-4 border-white opacity-20 animate-ping" style={{animationDelay: '0.5s'}}></div>
-              </div>
-              
-              <div className="relative mx-auto w-32 h-32 mb-4">
-                <Avatar className="w-32 h-32 mx-auto border-4 border-white shadow-lg">
-                  <AvatarImage src={selectedUserImage} />
-                  <AvatarFallback className="bg-white/20 text-white text-4xl font-bold">
-                    {incomingCall.callerUsername?.charAt(0).toUpperCase() || 'U'}
-                  </AvatarFallback>
-                </Avatar>
-              </div>
-              
-              <h3 className="text-2xl font-bold mb-2">
-                {incomingCall.callerUsername || 'Unknown User'}
-              </h3>
-              <p className="text-white/80 text-lg mb-2 flex items-center justify-center">
-                {React.createElement(getCallTypeIcon(incomingCallType), {
-                  className: "w-5 h-5 mr-2"
-                })}
-                Incoming {getCallTypeLabel(incomingCallType).toLowerCase()}...
-              </p>
-              
-              <div className="flex justify-center items-center space-x-2 mb-4">
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-white rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                  <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-                </div>
-              </div>
-              
-              <div className="text-white/60 text-sm mb-4">
-                {incomingCallType === 'audio' ? (
-                  <span>🎧 High quality audio call</span>
-                ) : (
-                  <span>📹 HD video call with audio</span>
-                )}
-              </div>
-            </div>
-            
-            <div className="flex justify-center space-x-8">
-              <button
-                onClick={rejectCall}
-                className="bg-red-500 hover:bg-red-600 text-white rounded-full p-6 shadow-lg transform hover:scale-105 transition-all duration-200"
-                title={`Decline ${incomingCallType} call`}
-              >
-                <PhoneOff className="w-8 h-8" />
-              </button>
-              <button
-                onClick={answerCall}
-                className="bg-green-500 hover:bg-green-600 text-white rounded-full p-6 shadow-lg transform hover:scale-105 transition-all duration-200 animate-pulse"
-                title={`Answer ${incomingCallType} call`}
-              >
-                {React.createElement(getCallTypeIcon(incomingCallType), {
-                  className: "w-8 h-8"
-                })}
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Incoming Call UI - Using the single component */}
+        <CallModalIncomingSection />
 
-        {/* Fix: Active call UI with proper audio handling */}
+        {/* Active call UI */}
         {isInCall && (
           <div className={`relative ${isCallFullscreen ? 'h-full' : 'h-96'}`}>
             {/* Call header */}
@@ -1575,7 +1298,7 @@ const CallModal = () => {
                   {callType === 'audio' && <Phone className="w-5 h-5" />}
                   {callType === 'video' && <VideoIcon className="w-5 h-5" />}
                   <div>
-                    <h3 className="font-semibold text-lg">{selectedUser || incomingCall?.callerUsername}</h3>
+                    <h3 className="font-semibold text-lg">{selectedUser}</h3>
                     <CallStatusDisplay />
                   </div>
                 </div>
@@ -1596,7 +1319,7 @@ const CallModal = () => {
               </div>
             </div>
 
-            {/* Fix: Video streams with proper audio handling */}
+            {/* Video streams with proper audio handling */}
             {callType === 'video' && (
               <div className="relative w-full h-full bg-gray-900">
                 {/* Remote video with audio */}
@@ -1604,7 +1327,6 @@ const CallModal = () => {
                   stream={remoteStream}
                   muted={false}
                   className="w-full h-full object-cover"
-                  isAudioOnly={false}
                 />
                 
                 {/* Local video (muted to prevent echo) */}
@@ -1613,7 +1335,6 @@ const CallModal = () => {
                     stream={localStream}
                     muted={true}
                     className="w-full h-full object-cover"
-                    isAudioOnly={false}
                   />
                 </div>
 
@@ -1625,7 +1346,7 @@ const CallModal = () => {
                         <Avatar className="w-32 h-32 mx-auto border-4 border-white shadow-lg">
                           <AvatarImage src={selectedUserImage} />
                           <AvatarFallback className="bg-gray-600 text-white text-4xl">
-                            {(selectedUser || incomingCall?.callerUsername)?.charAt(0).toUpperCase()}
+                            {selectedUser?.charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                         {isRinging && (
@@ -1642,57 +1363,42 @@ const CallModal = () => {
               </div>
             )}
 
-            {/* Fix: Audio call UI with proper audio element */}
+            {/* Audio call UI */}
             {callType === 'audio' && (
               <div className="relative w-full h-full">
-                {/* Audio elements for audio-only calls */}
+                {/* Hidden audio element for audio-only calls */}
                 {remoteStream && (
                   <AudioVideoElement 
                     stream={remoteStream}
                     muted={false}
-                    isAudioOnly={true}
-                  />
-                )}
-                
-                {localStream && (
-                  <AudioVideoElement 
-                    stream={localStream}
-                    muted={true}
-                    isAudioOnly={true}
+                    className="hidden"
                   />
                 )}
                 
                 <div className="flex flex-col items-center justify-center h-full bg-gradient-to-br from-green-500 to-blue-600 text-white">
-                  <div className="relative mb-8 w-24 h-24 bg-white/20 rounded-full flex items-center justify-center">
-                    <Phone className="w-12 h-12 text-white" />
-                    {isRinging && (
-                      <>
-                        <div className="absolute inset-0 rounded-full border-4 border-white opacity-30 animate-ping"></div>
-                        <div className="absolute inset-0 rounded-full border-4 border-white opacity-20 animate-ping" style={{animationDelay: '0.5s'}}></div>
-                      </>
-                    )}
-                  </div>
+                  {/* Audio call icon */}
+                 
                   
                   <div className="relative mb-8">
                     <Avatar className="w-40 h-40 border-4 border-white shadow-lg">
                       <AvatarImage src={selectedUserImage} />
                       <AvatarFallback className="bg-white/20 text-white text-5xl font-bold">
-                        {(selectedUser || incomingCall?.callerUsername)?.charAt(0).toUpperCase()}
+                        {selectedUser?.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                   </div>
                   
-                  <h3 className="text-3xl font-bold mb-2">{selectedUser || incomingCall?.callerUsername}</h3>
+                  <h3 className="text-3xl font-bold mb-2">{selectedUser}</h3>
                   <p className="text-white/80 text-lg mb-4 flex items-center">
                     <Phone className="w-5 h-5 mr-2" />
                     Audio Call
                   </p>
-                  <CallStatusDisplay />
+                 
                 </div>
               </div>
             )}
 
-            {/* Call controls - same as before */}
+            {/* Call controls */}
             {(callStatus !== 'failed' && callStatus !== 'offline' && callStatus !== 'no-answer') && (
               <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/60 to-transparent">
                 <div className="flex justify-center space-x-6">

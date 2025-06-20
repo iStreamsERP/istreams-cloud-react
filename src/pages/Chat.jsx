@@ -622,6 +622,8 @@ const endCall = () => {
   
   console.log('Call ended and cleaned up completely');
 };
+const METERED_TURN_USERNAME = '6f2e2279b8d10dc28a1c792c'; 
+const METERED_TURN_CREDENTIAL = 'ScGGto7DupSnIBvG'; //
 
 // 9. Enhanced peer initialization with better error handling
 const initializePeer = () => {
@@ -646,15 +648,67 @@ const initializePeer = () => {
     debug: 1, // Reduced debug level for cleaner logs
     config: {
       'iceServers': [
+        // Google STUN servers (free)
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:global.stun.twilio.com:3478' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-      ]
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun.relay.metered.ca:80' },
+
+        
+        // Metered TURN servers (replace with your actual Metered TURN URLs)
+        {
+          urls: 'turn:global.relay.metered.ca:80',
+          username: METERED_TURN_USERNAME,
+          credential: METERED_TURN_CREDENTIAL,
+        },
+        {
+          urls: 'turn:global.relay.metered.ca:80?transport=tcp',
+          username: METERED_TURN_USERNAME,
+          credential: METERED_TURN_CREDENTIAL,
+        },
+        {
+          urls: 'turn:global.relay.metered.ca:443',
+          username: METERED_TURN_USERNAME,
+          credential: METERED_TURN_CREDENTIAL,
+        },
+        {
+          urls: 'turn:global.relay.metered.ca:443?transport=tcp',
+          username: METERED_TURN_USERNAME,
+          credential: METERED_TURN_CREDENTIAL,
+        },
+        
+        // Alternative Metered TURN servers for redundancy
+        {
+          urls: 'turn:b.relay.metered.ca:80',
+          username: METERED_TURN_USERNAME,
+          credential: METERED_TURN_CREDENTIAL,
+        },
+        {
+          urls: 'turn:b.relay.metered.ca:80?transport=tcp',
+          username: METERED_TURN_USERNAME,
+          credential: METERED_TURN_CREDENTIAL,
+        },
+        {
+          urls: 'turn:b.relay.metered.ca:443',
+          username: METERED_TURN_USERNAME,
+          credential: METERED_TURN_CREDENTIAL,
+        },
+        {
+          urls: 'turn:b.relay.metered.ca:443?transport=tcp',
+          username: METERED_TURN_USERNAME,
+          credential: METERED_TURN_CREDENTIAL,
+        }
+      ],
+      // Additional ICE configuration for better connectivity
+      iceCandidatePoolSize: 10,
+      bundlePolicy: 'max-bundle',
+      rtcpMuxPolicy: 'require'
     }
   });
 
   peerInstance.on('open', (id) => {
     console.log('✅ Peer connected successfully with ID:', id);
+    console.log('🌐 Using Metered TURN servers for global connectivity');
     setPeer(peerInstance);
   });
 
@@ -691,7 +745,6 @@ const initializePeer = () => {
     console.log('🔗 Data connection established with:', conn.peer);
   });
 };
-
 // 10. Enhanced UI components with proper call type display
 
 // Enhanced CallStatusDisplay with better status messages

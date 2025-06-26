@@ -2,10 +2,6 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  getDashBoard_Master_Configuratio,
-  getDashBoardUpcomingEvent,
-} from "@/services/iStDashBoardServices";
 import { GrossSalaryChart } from "@/components/iStCharts/GrossSalaryBarChart";
 import {
   Card,
@@ -242,13 +238,13 @@ const DashboardPage = () => {
                   );
                 })}
               </div>
-                    <GrossSalaryChart DashBoardID={dashboardId} ChartNo={1} chartTitle={item.CHART1_TITLE} chartType="bar"  />
+                    <GrossSalaryChart DashBoardID={dashboardId} ChartNo={1} chartTitle={item.CHART1_TITLE} chartXAxis={item.CHART1_X_AXIS1} chartYAxis={item.CHART1_Y_AXIS1} chartType="bar"  />
 
               {/* Charts Section */}
               <div className="grid lg:grid-cols-2 grid-cols-1  gap-3">
                 
                 
-                    <GrossSalaryChart DashBoardID={dashboardId} ChartNo={2} chartTitle={item.CHART2_TITLE} chartType="donut" />
+                    <GrossSalaryChart DashBoardID={dashboardId} ChartNo={2} chartTitle={item.CHART2_TITLE}chartXAxis={item.CHART2_X_AXIS1} chartYAxis={item.CHART2_Y_AXIS1} chartType="donut" />
 
 
                   <Card className="shadow-xl bg-white dark:bg-slate-950 border rounded-xl ">

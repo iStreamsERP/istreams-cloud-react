@@ -1,1901 +1,1297 @@
-
-import React, { useState, useEffect, useRef } from "react";
-import { format, isToday, isYesterday } from "date-fns";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Search,
-  Paperclip,
-  Mic,
-  Smile,
-  ChevronDown,
-  MoreVertical,
-  Send,
-  CheckCheck,
-  Check,
-  Menu,
-  Plus,
-  X,
-  Image,
-  File,
-  Video,
-  User,
-  ArrowLeft,
-  Phone,
-  VideoIcon,
-  Info,
-  Volume2,
-  VolumeX,
-  MessageSquare,
-  PhoneOff,
-  VideoOff,
-  Monitor,
-  MonitorOff,
-  Maximize2,
-  Minimize2,
-} from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
-import {
-  getListUserMessage,
-  getSpecificUserMessage,
-  sentMessage,
-} from "@/services/chatService";
-import Peer from 'peerjs';
-import { useSearchParams, useNavigate } from "react-router-dom";
-import { callSoapService } from "@/services/callSoapService";
-
-const Chat = () => {
-  const { userData } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
+import { useEffect, useState , useRef, useCallback} from "react"
+import { Bar, BarChart, Cell, LabelList, XAxis, YAxis, ResponsiveContainer, Legend, Tooltip, LineChart, Line, AreaChart, Area, PieChart, Pie } from "recharts"
+import {Tooltip as FormateTooltip,TooltipProvider, TooltipContent , TooltipTrigger} from "@/components/ui/tooltip"
+import { useAuth } from "@/contexts/AuthContext"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Separator } from "@/components/ui/separator"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { ChevronDown, X, BarChart3, TrendingUp, Settings, Palette, Eye, Download, Activity, AreaChart as AreaChartIcon, BarChart4, PieChart as PieChartIcon } from "lucide-react"
+import { callSoapService } from "@/services/callSoapService"
+import { useNavigate } from "react-router-dom"
+export function GrossSalaryChart({ DashBoardID, ChartNo, chartTitle ,chartType: initialChartType = "bar",chartXAxis,chartYAxis}) {
+  const { userData } = useAuth()
+  const [tasks, setTasks] = useState([])
+  const [displayFormat, setDisplayFormat] = useState("D") // D: Default, K: Thousands, M: Millions
+  const [selectedXAxes, setSelectedXAxes] = useState([])
+  const [selectedYAxes, setSelectedYAxes] = useState([])
+  const [textFields, setTextFields] = useState([])
+  const [numericFields, setNumericFields] = useState([])
   
-  const [users, setUsers] = useState([]);
-  const [filteredUsers, setFilteredUsers] = useState([]);
-  const [listOfMsg, setListOfMsg] = useState([]);
-  const [filteredMessages, setFilteredMessages] = useState([]);
-  const [specificMessages, setSpecificMessages] = useState([]);
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [selectedUserImage, setSelectedUserImage] = useState("");
-  const [messageSearchTerm, setMessageSearchTerm] = useState("");
-  const [newMessage, setNewMessage] = useState("");
-  const [onlineStatus, setOnlineStatus] = useState({});
-  const [showContactInfo, setShowContactInfo] = useState(false);
-  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [messageStatus, setMessageStatus] = useState({});
-  const [showMobileChat, setShowMobileChat] = useState(false);
-  const [showUserList, setShowUserList] = useState(false);
-  const [userSearchTerm, setUserSearchTerm] = useState("");
+  // Chart type selection - Added pie and donut
+  const [chartType, setChartType] = useState(initialChartType) // bar, horizontalBar, line, area, pie, donut
   
-  // Call-related states
-  const [showCallModal, setShowCallModal] = useState(false);
-  const [callType, setCallType] = useState(null); // 'audio' or 'video'
-  const [isInCall, setIsInCall] = useState(false);
-  const [isCallConnected, setIsCallConnected] = useState(false);
-  const [localStream, setLocalStream] = useState(null);
-  const [remoteStream, setRemoteStream] = useState(null);
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const [isVideoEnabled, setIsVideoEnabled] = useState(true);
-  const [isAudioEnabled, setIsAudioEnabled] = useState(true);
-  const [callDuration, setCallDuration] = useState(0);
-  const [isCallFullscreen, setIsCallFullscreen] = useState(false);
-  const [incomingCall, setIncomingCall] = useState(null);
-  const [peer, setPeer] = useState(null);
-  const [currentCall, setCurrentCall] = useState(null);
-  const [callError, setCallError] = useState(null);
-  const [callStatus, setCallStatus] = useState(''); // 'calling', 'connecting', 'connected', 'failed', 'ended'
-  const [showCallError, setShowCallError] = useState(false);
-  const [isRinging, setIsRinging] = useState(false);
-  const [ringtone, setRingtone] = useState(null);
-  const [callTimeout, setCallTimeout] = useState(null);
-// 1. Updated state management for better call type detection
-const [callMetadata, setCallMetadata] = useState(null); // Store call type info
-const [isInitiatingCall, setIsInitiatingCall] = useState(false);
-const [callHistory, setCallHistory] = useState([]);
-  const chatEndRef = useRef(null);
-  const fileInputRef = useRef(null);
-  const imageInputRef = useRef(null);
-  const videoInputRef = useRef(null);
-  const localVideoRef = useRef(null);
-  const remoteVideoRef = useRef(null);
-  const callDurationRef = useRef(null);
+  // Enhanced chart options
+  const [showDataLabels, setShowDataLabels] = useState(true)
+  const [dataLabelPosition, setDataLabelPosition] = useState("top") // top, inside, outside, center
+  const [chartHeight, setChartHeight] = useState(450)
+  const [barRadius, setBarRadius] = useState(4)
+  const [showGrid, setShowGrid] = useState(false)
+  const [colorScheme, setColorScheme] = useState("default")
+  const [showLegend, setShowLegend] = useState(true)
+  const [legendPosition, setLegendPosition] = useState("bottom")
+  const [barGap, setBarGap] = useState(4)
+  const [fontSize, setFontSize] = useState(12)
+  const [showTooltip, setShowTooltip] = useState(true)
+  const [sortOrder, setSortOrder] = useState("none") // none, asc, desc
+  const [legendFontSize, setLegendFontSize] = useState(14)
+  const [maxBarsToShow, setMaxBarsToShow] = useState(50)
+  const [customTitle, setCustomTitle] = useState(chartTitle)
+
+ 
+
+  // Pie/Donut chart specific options
+  const [pieOuterRadius, setPieOuterRadius] = useState(100)
+  const [pieInnerRadius, setPieInnerRadius] = useState(0) // 0 for pie, >0 for donut
+  const [showPieLabels, setShowPieLabels] = useState(true)
+  const [pieStartAngle, setPieStartAngle] = useState(0)
+  const [pieEndAngle, setPieEndAngle] = useState(360)
+
+  const [selectedRangeField, setSelectedRangeField] = useState("")
+  const [rangeMin, setRangeMin] = useState(0)
+  const [rangeMax, setRangeMax] = useState(100000)
+  
+  const [selectedCategories, setSelectedCategories] = useState({}) // Object to track selected values per field
+  const [availableCategories, setAvailableCategories] = useState({}) // Object to store unique values per field
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+
+  const navigate = useNavigate()
+  const currencySymbol = userData?.companyCurrSymbol || "$"
+
+  const formatFieldName = (fieldName) => {
+    return fieldName
+      .replace(/[_-]/g, " ")
+      .toLowerCase()
+      .replace(/^\w/, (c) => c.toUpperCase())
+  }
+
+  const isNumericField = (fieldName, sampleData) => {
+    const value = sampleData[fieldName]
+    if (value === null || value === undefined || value === '') return false
+    
+    // Check if it's already a number
+    if (typeof value === 'number') return true
+    
+    // Check if it can be converted to a valid number
+    const numValue = Number(value)
+    return !isNaN(numValue) && isFinite(numValue)
+  }
 
   useEffect(() => {
-    fetchUsersAndMessages();
-    initializePeer();
-  }, []);
+    if (DashBoardID && ChartNo) {
+      fetchChartData()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [DashBoardID, ChartNo])
 
   useEffect(() => {
-    // Create ringtone audio for outgoing calls
-    const outgoingRingtone = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmEUBT2a2u3CcOr/'); // Short beep sound
-    outgoingRingtone.loop = true;
-    setRingtone(outgoingRingtone);
+  if (initialChartType) {
+    setChartType(initialChartType)
+  }
+}, [initialChartType])
+  // Update inner radius when chart type changes
+  useEffect(() => {
+    if (chartType === "donut") {
+      setPieInnerRadius(40) // Set default inner radius for donut
+    } else if (chartType === "pie") {
+      setPieInnerRadius(0) // No inner radius for pie
+    }
+  }, [chartType])
+useEffect(() => {
+  if (selectedYAxes.length > 0) {
+    // Automatically set the first Y-axis field as the range field
+    const firstYField = selectedYAxes[0];
+    setSelectedRangeField(firstYField);
+    
+    // Auto-calculate range when field is set
+    if (tasks.length > 0) {
+      const values = tasks.map(task => parseFloat(task[firstYField]) || 0).filter(v => !isNaN(v));
+      if (values.length > 0) {
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        setRangeMin(min);
+        setRangeMax(max);
+      }
+    }
+  } else {
+    // Clear range field when no Y-axes selected
+    setSelectedRangeField("");
+  }
+}, [selectedYAxes, tasks]);
+
+  useEffect(() => {
+  if (chartType === "stackedBar" || chartType === "horizontalStackedBar") {
+    setDataLabelPosition("center")
+  } else {
+    setDataLabelPosition("top") // or whatever your default should be
+  }
+}, [chartType])
+const [isDragging, setIsDragging] = useState({ min: false, max: false });
+const sliderRef = useRef(null);
+
+// Add these helper functions
+const dataMin = Math.min(...tasks.map(t => parseFloat(t[selectedRangeField]) || 0));
+const dataMax = Math.max(...tasks.map(t => parseFloat(t[selectedRangeField]) || 0));
+
+const valueToPercent = (value) => {
+  return ((value - dataMin) / (dataMax - dataMin)) * 100;
+};
+
+const getValueFromPosition = useCallback((clientX) => {
+  if (!sliderRef.current) return dataMin;
+  
+  const rect = sliderRef.current.getBoundingClientRect();
+  const percent = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+  return dataMin + (percent / 100) * (dataMax - dataMin);
+}, [dataMin, dataMax]);
+
+const handleMouseDown = (type) => (e) => {
+  e.preventDefault();
+  setIsDragging({ ...isDragging, [type]: true });
+};
+
+const handleMouseMove = useCallback((e) => {
+  if (!isDragging.min && !isDragging.max) return;
+  
+  const newValue = getValueFromPosition(e.clientX);
+  
+  if (isDragging.min) {
+    const maxAllowed = rangeMax - (dataMax - dataMin) * 0.01;
+    const adjustedValue = Math.max(dataMin, Math.min(newValue, maxAllowed));
+   setRangeMin(Math.floor(adjustedValue));
+  }
+  
+  if (isDragging.max) {
+    const minAllowed = rangeMin + (dataMax - dataMin) * 0.01;
+    const adjustedValue = Math.min(dataMax, Math.max(newValue, minAllowed));
+    setRangeMax(Math.floor(adjustedValue));
+  }
+}, [isDragging, rangeMin, rangeMax, dataMin, dataMax, getValueFromPosition]);
+
+const handleMouseUp = useCallback(() => {
+  setIsDragging({ min: false, max: false });
+}, []);
+
+// Add this useEffect for global event listeners
+useEffect(() => {
+  if (isDragging.min || isDragging.max) {
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
     
     return () => {
-      if (outgoingRingtone) {
-        outgoingRingtone.pause();
-        outgoingRingtone.currentTime = 0;
-      }
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, []);
-
-// 2. Enhanced convertEmailToPeerId with better validation
-const convertEmailToPeerId = (email) => {
-  if (!email) return null;
-  return email.replace(/[@.]/g, '_').toLowerCase();
-};
-
-const convertPeerIdToEmail = (peerId) => {
-  if (!peerId || !peerId.includes('_')) return peerId + '@demo.com';
-  const parts = peerId.split('_');
-  if (parts.length >= 2) {
-    return parts[0] + '@' + parts.slice(1).join('.');
   }
-  return peerId + '@demo.com';
-};
-const startCall = async (type) => {
-  if (!peer || !selectedUser || isInitiatingCall) {
-    setCallError('Connection not ready. Please try again.');
-    setShowCallError(true);
-    return;
-  }
+}, [isDragging, handleMouseMove, handleMouseUp]);
 
-  try {
-    setIsInitiatingCall(true);
-    setCallType(type);
-    setIsInCall(true);
-    setShowCallModal(true);
-    setCallStatus('calling');
-    setCallError(null);
-    setIsRinging(true);
-
-    console.log(`Starting ${type} call to:`, selectedUser);
-
-    // Start playing ringtone for outgoing call
-    if (ringtone) {
-      ringtone.currentTime = 0;
-      ringtone.play().catch(console.error);
-    }
-
-    // Get media with proper constraints based on call type
-    const constraints = {
-      video: type === 'video',
-      audio: true
-    };
-
-    console.log('Getting user media with constraints:', constraints);
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    setLocalStream(stream);
-
-    if (localVideoRef.current) {
-      localVideoRef.current.srcObject = stream;
-    }
-
-    // ENHANCED: Create call metadata with explicit call type info
-    const callMetadata = {
-      type: type, // 'audio' or 'video'
-      timestamp: Date.now(),
-      caller: userData.userName,
-      callerEmail: userData.userEmail // Add caller email for better identification
-    };
-
-    // Store metadata for this call
-    setCallMetadata(callMetadata);
-
-    const recipientEmail = selectedUser.toLowerCase() + '@demo.com';
-    const recipientPeerId = convertEmailToPeerId(recipientEmail);
-    
-    console.log('Call details:', {
-      selectedUser,
-      recipientEmail,
-      recipientPeerId,
-      myPeerId: peer.id,
-      callType: type,
-      metadata: callMetadata
-    });
-    
-    setCallStatus('connecting');
-    
-    // Create the call with enhanced metadata
-    const call = peer.call(recipientPeerId, stream, {
-      metadata: callMetadata // This will be received by the incoming call handler
-    });
-    
-    if (!call) {
-      throw new Error('Failed to initiate call');
-    }
-    
-    setCurrentCall(call);
-
-    // Enhanced timeout handling
-    const timeout = setTimeout(() => {
-      if (!isCallConnected) {
-        console.log('Call timeout - recipient not available');
-        handleCallTimeout();
-      }
-    }, 30000);
-
-    setCallTimeout(timeout);
-
-    // Handle remote stream
-    call.on('stream', (remoteStream) => {
-      console.log('Received remote stream');
-      handleRemoteStreamReceived(remoteStream);
-    });
-
-    // Handle call close
-    call.on('close', () => {
-      console.log('Call closed by remote peer');
-      handleCallClosed();
-    });
-
-    // Enhanced error handling
-    call.on('error', (error) => {
-      console.error('Call error:', error);
-      handleCallError(error);
-    });
-
-  } catch (error) {
-    console.error('Error starting call:', error);
-    handleCallInitError(error);
-  } finally {
-    setIsInitiatingCall(false);
-  }
-};
-
-// 2. Update handleIncomingCall to properly detect call type from metadata
-const handleIncomingCall = (call) => {
-  console.log('Incoming call from peer:', call.peer);
-  console.log('Call metadata:', call.metadata); // This will contain the call type
+const getFieldMaxValue = (fieldName) => {
+  if (!fieldName || tasks.length === 0) return 100000; // default fallback
   
-  // Fix: Better peer ID to username conversion
-  let callerUsername;
-  if (call.peer.includes('_')) {
-    const callerEmail = convertPeerIdToEmail(call.peer);
-    console.log('Caller email:', callerEmail);
-    callerUsername = callerEmail.replace('@demo.com', '');
+  const values = tasks
+    .map(task => parseFloat(task[fieldName]) || 0)
+    .filter(value => !isNaN(value) && isFinite(value));
+  
+  if (values.length === 0) return 100000; // fallback if no valid values
+  
+  const maxValue = Math.max(...values);
+  // Round up to nearest significant number for better UX
+  const magnitude = Math.pow(10, Math.floor(Math.log10(maxValue)));
+  return Math.ceil(maxValue / magnitude) * magnitude;
+};
+
+const getFieldMinValue = (fieldName) => {
+  if (!fieldName || tasks.length === 0) return 0; // default fallback
+  
+  const values = tasks
+    .map(task => parseFloat(task[fieldName]) || 0)
+    .filter(value => !isNaN(value) && isFinite(value));
+  
+  if (values.length === 0) return 0; // fallback if no valid values
+  
+  const minValue = Math.min(...values);
+  // Round down to nearest significant number for better UX
+  const magnitude = Math.pow(10, Math.floor(Math.log10(Math.abs(minValue))));
+  return Math.floor(minValue / magnitude) * magnitude;
+};
+
+
+const getEffectiveChartType = () => {
+  // If pie or donut chart has more than 1 Y-axis field, make it stacked
+  if ((chartType === "pie" || chartType === "donut") && selectedYAxes.length > 1) {
+    return chartType === "pie" ? "stackedPie" : "stackedDonut"
+  }
+  return chartType
+}
+useEffect(() => {
+  // Re-fetch data when X or Y axes selections change
+  if (DashBoardID && ChartNo && (selectedXAxes.length > 0 || selectedYAxes.length > 0)) {
+    fetchChartData()
+  }
+}, [selectedXAxes, selectedYAxes])
+const fetchChartData = async () => {
+  try {
+    const chartID = { DashBoardID, ChartNo }
+    const res = await callSoapService(userData.clientURL, "BI_GetDashboard_Chart_Data", chartID);
+    
+    console.log("Fetched chart data:", res)
+    
+    // Separate fields by type
+    if (res.length > 0) {
+      const sampleData = res[0]
+      const allFields = Object.keys(sampleData)
+               
+      const textFieldsList = []
+      const numericFieldsList = []
+               
+      allFields.forEach(field => {
+        if (isNumericField(field, sampleData)) {
+          numericFieldsList.push(field)
+        } else {
+          textFieldsList.push(field)
+        }
+      })
+               
+      setTextFields(textFieldsList)
+      setNumericFields(numericFieldsList)
+      
+      // Set default axes if not already selected
+      if (selectedXAxes.length === 0) {
+        if (chartXAxis && textFieldsList.includes(chartXAxis)) {
+          setSelectedXAxes([chartXAxis])
+        } else if (textFieldsList.length > 0) {
+          setSelectedXAxes([textFieldsList[0]])
+        }
+      }
+      
+      if (selectedYAxes.length === 0) {
+        if (chartYAxis && numericFieldsList.includes(chartYAxis)) {
+          setSelectedYAxes([chartYAxis])
+        } else if (numericFieldsList.length > 0) {
+          setSelectedYAxes([numericFieldsList[0]])
+        }
+      }
+      
+      // Call grouping API only if we have both X and Y axes selected
+      if ((selectedXAxes.length > 0 || (chartXAxis && textFieldsList.includes(chartXAxis))) && 
+          (selectedYAxes.length > 0 || (chartYAxis && numericFieldsList.includes(chartYAxis)))) {
+        
+        // Prepare data for grouping API call
+        const inputJSONData = JSON.stringify(res); // Raw JSON data from first API call
+        
+        // Use selected X-axes or fallback to default
+        const groupColumns = selectedXAxes.length > 0 ? 
+          selectedXAxes.join(",") : 
+          (chartXAxis && textFieldsList.includes(chartXAxis) ? chartXAxis : "");
+        
+        // Use selected Y-axes or fallback to default
+        let yAxisColumns = [];
+        if (selectedYAxes.length > 0) {
+          yAxisColumns = selectedYAxes;
+        } else if (chartYAxis && numericFieldsList.includes(chartYAxis)) {
+          yAxisColumns = [chartYAxis];
+        } else if (numericFieldsList.length > 0) {
+          yAxisColumns = [numericFieldsList[0]];
+        }
+        
+        const summaryColumns = yAxisColumns.map(col => `SUM:${col}`).join(",");
+        
+        const jsonDataID = {
+          inputJSONData: inputJSONData,
+          FilterCondition: "",
+          groupColumns: groupColumns,
+          summaryColumns: summaryColumns
+        }
+        
+        console.log("Grouped json:", inputJSONData);
+        console.log("Grouped col:", groupColumns);
+        console.log("Grouped sum:", summaryColumns);
+
+        // Call the grouping API with processed data
+        const groupedData = await callSoapService(userData.clientURL, "Data_Group_JSONValues", jsonDataID);
+        console.log("Grouped chart data:", groupedData);
+        
+        // Use the grouped data for the chart
+        setTasks(groupedData)
+      } else {
+        // If no axes selected, use original data
+        setTasks(res)
+      }
+    } else {
+      // If no data from first API call, set empty tasks
+      setTasks([])
+    }
+  } catch (error) {
+    console.error("Failed to fetch chart data", error)
+  }
+}
+  const handleXAxisChange = (field, checked) => {
+    if (checked) {
+      setSelectedXAxes([...selectedXAxes, field])
+    } else {
+      setSelectedXAxes(selectedXAxes.filter(f => f !== field))
+    }
+  }
+
+  const handleYAxisChange = (field, checked) => {
+    if (checked) {
+      setSelectedYAxes([...selectedYAxes, field])
+    } else {
+      setSelectedYAxes(selectedYAxes.filter(f => f !== field))
+    }
+  }
+
+  const removeXAxisField = (field) => {
+    setSelectedXAxes(selectedXAxes.filter(f => f !== field))
+  }
+
+  const removeYAxisField = (field) => {
+    setSelectedYAxes(selectedYAxes.filter(f => f !== field))
+  }
+
+  useEffect(() => {
+  if (tasks.length > 0 && selectedXAxes.length > 0) {
+    const categoriesPerField = {}
+    const selectedPerField = {}
+    
+    selectedXAxes.forEach(xField => {
+      const uniqueValues = new Set()
+      
+      tasks.forEach(task => {
+        const value = task[xField] || "Unknown"
+        uniqueValues.add(String(value))
+      })
+      
+      const sortedValues = Array.from(uniqueValues).sort()
+      categoriesPerField[xField] = sortedValues
+      
+      // If no categories are selected for this field, select all by default
+      if (!selectedCategories[xField] || selectedCategories[xField].length === 0) {
+        selectedPerField[xField] = sortedValues
+      } else {
+        // Filter out any previously selected values that no longer exist
+        selectedPerField[xField] = selectedCategories[xField].filter(val => sortedValues.includes(val))
+      }
+    })
+    
+    setAvailableCategories(categoriesPerField)
+    setSelectedCategories(selectedPerField)
   } else {
-    callerUsername = call.peer;
+    setAvailableCategories({})
+    setSelectedCategories({})
   }
+}, [tasks, selectedXAxes])
+
+// Add handlers for category filtering
+const handleCategoryChange = (field, value, checked) => {
+  setSelectedCategories(prev => {
+    const fieldCategories = prev[field] || []
+    if (checked) {
+      return { ...prev, [field]: [...fieldCategories, value] }
+    } else {
+      return { ...prev, [field]: fieldCategories.filter(v => v !== value) }
+    }
+  })
+}
+
+const selectAllCategories = (field) => {
+  setSelectedCategories(prev => ({
+    ...prev,
+    [field]: [...(availableCategories[field] || [])]
+  }))
+}
+
+const deselectAllCategories = (field) => {
+  setSelectedCategories(prev => ({
+    ...prev,
+    [field]: []
+  }))
+}
+
+const processChartData = () => {
+  if (selectedXAxes.length === 0 || selectedYAxes.length === 0) return []
+
+  const grouped = {}
+
+  tasks.forEach(task => {
+    // Apply range filter if a Y-axis field is selected for filtering
+    if (selectedRangeField && selectedYAxes.includes(selectedRangeField)) {
+      const fieldValue = parseFloat(task[selectedRangeField]) || 0
+      if (fieldValue < rangeMin || fieldValue > rangeMax) {
+        return // Skip this record
+      }
+    }
+
+    // NEW: Apply category filter - check each X-axis field
+    let shouldInclude = true
+    for (const xField of selectedXAxes) {
+      const fieldValue = String(task[xField] || "Unknown")
+      const selectedForField = selectedCategories[xField] || []
+      
+      if (selectedForField.length > 0 && !selectedForField.includes(fieldValue)) {
+        shouldInclude = false
+        break
+      }
+    }
+    
+    if (!shouldInclude) {
+      return // Skip this record
+    }
+
+    // Create combined X-axis key from selected X fields (values only, no headers)
+    const xKey = selectedXAxes.map(xField => {
+      const value = task[xField]
+      return value || "Unknown"
+    }).join(" | ")
+    
+    if (!grouped[xKey]) {
+      grouped[xKey] = { combinedKey: xKey, name: xKey } // Add 'name' for pie chart
+      selectedYAxes.forEach(yField => {
+        grouped[xKey][yField] = 0
+      })
+    }
+
+    selectedYAxes.forEach(yField => {
+      const yValue = parseFloat(task[yField]) || 0
+      grouped[xKey][yField] += yValue
+    })
+  })
+
+  let processedData = Object.values(grouped)
+
+  // Apply sorting
+  if (sortOrder !== "none" && selectedYAxes.length > 0) {
+    const primaryYField = selectedYAxes[0]
+    processedData.sort((a, b) => {
+      const valueA = a[primaryYField] || 0
+      const valueB = b[primaryYField] || 0
+      return sortOrder === "asc" ? valueA - valueB : valueB - valueA
+    })
+  }
+
+  // Limit number of bars
+  if (maxBarsToShow > 0) {
+    processedData = processedData.slice(0, maxBarsToShow)
+  }
+
+  return processedData
+}
+
+// 3. Make sure this line comes AFTER the processChartData function:
+const chartData = processChartData()
+
+  const calculateTotal = (field) => {
+    return chartData.reduce((sum, item) => sum + (item[field] || 0), 0)
+  }
+
+const formatValue = (value, fieldName = '') => {
+  if (typeof value !== 'number') return value
   
-  console.log('Caller username:', callerUsername);
-  
-  const callerUser = users.find(user => 
-    user.user_name.toLowerCase() === callerUsername.toLowerCase()
+  // Check if field name contains currency-related keywords
+  const currencyKeywords = ['currency', 'curr', 'cost', 'value', 'amount', 'salary', 'salaries'];
+  const fieldNameStr = String(fieldName || '');
+  const shouldShowCurrency = currencyKeywords.some(keyword => 
+    fieldNameStr.toLowerCase().includes(keyword.toLowerCase())
   );
-  const callerName = callerUser ? callerUser.user_name : callerUsername;
   
-  // ENHANCED: Detect call type from metadata first, then from stream as fallback
-  let detectedCallType = 'audio'; // Default fallback
-  
-  if (call.metadata && call.metadata.type) {
-    // Primary method: Use metadata passed from caller
-    detectedCallType = call.metadata.type;
-    console.log('Call type detected from metadata:', detectedCallType);
-  }
-  
-  setIncomingCallType(detectedCallType);
-  
-  // Fallback: Also check stream when it arrives (in case metadata is missing)
-  call.on('stream', (remoteStream) => {
-    const videoTracks = remoteStream.getVideoTracks();
-    const streamBasedType = videoTracks.length > 0 ? 'video' : 'audio';
+  // Helper function to format numbers in Indian style (lakhs/crores system)
+  const formatIndianNumber = (num) => {
+    const isNegative = num < 0
+    const absNum = Math.abs(num)
+    const numStr = absNum.toString()
     
-    // Only update if we didn't get metadata or if stream contradicts metadata
-    if (!call.metadata || !call.metadata.type) {
-      console.log('Updating call type based on stream:', streamBasedType);
-      setIncomingCallType(streamBasedType);
-    } else {
-      console.log('Stream-based type:', streamBasedType, 'matches metadata type:', call.metadata.type);
-    }
-  });
-  
-  call.callerUsername = callerName;
-  setIncomingCall(call);
-  setShowCallModal(true);
-  setCallStatus('incoming');
-  
-  // Play incoming call ringtone
-  if (ringtone) {
-    ringtone.currentTime = 0;
-    ringtone.play().catch(console.error);
-  }
-  
-  // ENHANCED: Auto-reject after 30 seconds with proper cleanup
-  const autoRejectTimeout = setTimeout(() => {
-    console.log('Auto-rejecting call after 30 seconds');
-    rejectCall();
-  }, 30000);
-  
-  // Store timeout reference for cleanup
-  call.autoRejectTimeout = autoRejectTimeout;
-};
-
-// 3. Update answerCall to use the detected call type
-const answerCall = async () => {
-  if (!incomingCall) return;
-
-  try {
-    const callTypeToUse = incomingCallType || 'audio'; // Use detected type or fallback to audio
-    console.log(`Answering ${callTypeToUse} call`);
-    
-    // Stop ringtone
-    if (ringtone) {
-      ringtone.pause();
-      ringtone.currentTime = 0;
+    if (numStr.length <= 3) {
+      return (isNegative ? '-' : '') + numStr
     }
     
-    // Clear auto-reject timeout
-    if (incomingCall.autoRejectTimeout) {
-      clearTimeout(incomingCall.autoRejectTimeout);
-    }
-
-    // Get media with proper constraints based on detected call type
-    const constraints = {
-      video: callTypeToUse === 'video',
-      audio: true
-    };
-
-    console.log('Answering with constraints:', constraints);
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    setLocalStream(stream);
-    setCallType(callTypeToUse); // Set the call type based on what was detected
-    setIsInCall(true);
-    setCallStatus('connecting');
-
-    if (localVideoRef.current) {
-      localVideoRef.current.srcObject = stream;
-    }
-
-    // Answer the call with our stream
-    incomingCall.answer(stream);
-    setCurrentCall(incomingCall);
-
-    // Handle remote stream
-    incomingCall.on('stream', (remoteStream) => {
-      console.log('Received remote stream in answer');
-      handleRemoteStreamReceived(remoteStream);
-    });
-
-    incomingCall.on('close', () => {
-      console.log('Answered call closed');
-      handleCallClosed();
-    });
-
-    incomingCall.on('error', (error) => {
-      console.error('Answer call error:', error);
-      handleCallError(error);
-    });
-
-    setIncomingCall(null);
-    setIncomingCallType(null);
+    // Split into groups: first 3 digits from right, then groups of 2
+    const firstThree = numStr.slice(-3)
+    const remaining = numStr.slice(0, -3)
     
-  } catch (error) {
-    console.error('Error answering call:', error);
-    handleCallInitError(error);
-    rejectCall();
-  }
-};
-
-// 4. Update the rejectCall function to handle timeout cleanup
-const rejectCall = () => {
-  console.log('Rejecting call');
-  
-  if (ringtone) {
-    ringtone.pause();
-    ringtone.currentTime = 0;
-  }
-  
-  if (incomingCall) {
-    // Clear auto-reject timeout
-    if (incomingCall.autoRejectTimeout) {
-      clearTimeout(incomingCall.autoRejectTimeout);
+    let formatted = firstThree
+    let remainingStr = remaining
+    
+    // Add commas for every 2 digits from right to left in the remaining part
+    while (remainingStr.length > 0) {
+      if (remainingStr.length <= 2) {
+        formatted = remainingStr + ',' + formatted
+        break
+      } else {
+        const lastTwo = remainingStr.slice(-2)
+        formatted = lastTwo + ',' + formatted
+        remainingStr = remainingStr.slice(0, -2)
+      }
     }
     
-    // Send rejection signal
-    try {
-      incomingCall.close();
-    } catch (error) {
-      console.error('Error closing incoming call:', error);
-    }
-    setIncomingCall(null);
+    return (isNegative ? '-' : '') + formatted
   }
   
-  setIncomingCallType(null);
-  setShowCallModal(false);
-  setCallStatus('');
-  setCallType(null);
-};
-
-
-
-// 6. Helper functions for better error handling
-const handleCallTimeout = () => {
-  setIsRinging(false);
-  if (ringtone) {
-    ringtone.pause();
-    ringtone.currentTime = 0;
-  }
-  
-  setCallStatus('no-answer');
-  setCallError(`${selectedUser} didn't answer the call.`);
-  setShowCallError(true);
-  endCall();
-};
-
-const handleRemoteStreamReceived = (remoteStream) => {
-  console.log('Remote stream received, setting up...');
-  
-  if (callTimeout) {
-    clearTimeout(callTimeout);
-    setCallTimeout(null);
-  }
-  
-  setIsRinging(false);
-  if (ringtone) {
-    ringtone.pause();
-    ringtone.currentTime = 0;
-  }
-  
-  setRemoteStream(remoteStream);
-  setIsCallConnected(true);
-  setCallStatus('connected');
-  
-  if (remoteVideoRef.current) {
-    remoteVideoRef.current.srcObject = remoteStream;
-  }
-  
-  // Start call duration timer
-  setCallDuration(0);
-  
-  // Log call in history
-  const callRecord = {
-    id: Date.now(),
-    user: selectedUser || incomingCall?.callerUsername,
-    type: callType,
-    duration: 0,
-    timestamp: new Date(),
-    status: 'connected'
-  };
-  setCallHistory(prev => [callRecord, ...prev]);
-};
-
-const handleCallClosed = () => {
-  console.log('Call closed, cleaning up...');
-  if (callTimeout) {
-    clearTimeout(callTimeout);
-    setCallTimeout(null);
-  }
-  setIsRinging(false);
-  if (ringtone) {
-    ringtone.pause();
-    ringtone.currentTime = 0;
-  }
-  setCallStatus('ended');
-  endCall();
-};
-
-const handleCallError = (error) => {
-  if (callTimeout) {
-    clearTimeout(callTimeout);
-    setCallTimeout(null);
-  }
-  setIsRinging(false);
-  if (ringtone) {
-    ringtone.pause();
-    ringtone.currentTime = 0;
-  }
-  setCallStatus('failed');
-  
-  let errorMessage = 'Failed to connect call. Please try again.';
-  
-  switch (error.type) {
-    case 'peer-unavailable':
-      errorMessage = `${selectedUser} is currently offline or unavailable.`;
-      setCallStatus('offline');
-      break;
-    case 'network':
-      errorMessage = 'Network connection issue. Please check your internet connection.';
-      break;
-    case 'disconnected':
-      errorMessage = 'Connection lost. Please try calling again.';
-      break;
-    case 'call-rejected':
-      errorMessage = `${selectedUser} declined the call.`;
-      break;
+  // Check if currency is INR (Indian Rupee)
+  const isINR = userData.companyCurrIsIndianStandard === false;
+  const prefix = shouldShowCurrency ? `${currencySymbol} ` : '';
+  switch (displayFormat) {
+    case "K":
+      if (isINR) {
+        return `${prefix}${formatIndianNumber(Math.round(value / 1000))}k`;
+      } else {
+        return `${prefix}${(value / 1000).toFixed(userData?.companyCurrDecimals || 0)}k`;
+      }
+    case "M":
+      if (isINR) {
+        return `${prefix}${formatIndianNumber(Math.round(value / 1_000_000))}M`;
+      } else {
+        return `${prefix}${(value / 1_000_000).toFixed(userData?.companyCurrDecimals || 0)}M`;
+      }
     default:
-      if (error.message) {
-        errorMessage = error.message;
+      if (isINR) {
+        return `${prefix}${formatIndianNumber(Math.round(value))}`;
+      } else {
+        return `${prefix}${value.toLocaleString()}`;
       }
   }
-  
-  setCallError(errorMessage);
-  setShowCallError(true);
-  endCall();
-};
-
-const handleCallInitError = (error) => {
-  setIsRinging(false);
-  if (ringtone) {
-    ringtone.pause();
-    ringtone.currentTime = 0;
-  }
-  setCallStatus('failed');
-  
-  let errorMessage = 'Failed to start call. Please try again.';
-  
-  switch (error.name) {
-    case 'NotAllowedError':
-      errorMessage = 'Camera/microphone access denied. Please allow access in your browser settings and try again.';
-      break;
-    case 'NotFoundError':
-      errorMessage = 'Camera/microphone not found. Please check your devices and try again.';
-      break;
-    case 'NotReadableError':
-      errorMessage = 'Camera/microphone is being used by another application. Please close other apps and try again.';
-      break;
-    case 'OverconstrainedError':
-      errorMessage = 'Your device does not support the required video/audio format.';
-      break;
-    default:
-      if (error.message) {
-        errorMessage = error.message;
-      }
-  }
-  
-  setCallError(errorMessage);
-  setShowCallError(true);
-  endCall();
-};
+}
 
 
-// 8. Enhanced endCall function with better cleanup
-const endCall = () => {
-  console.log('Ending call - comprehensive cleanup');
-  
-  // Stop ringtone
-  setIsRinging(false);
-  if (ringtone) {
-    ringtone.pause();
-    ringtone.currentTime = 0;
-  }
-  
-  // Clear all timeouts
-  if (callTimeout) {
-    clearTimeout(callTimeout);
-    setCallTimeout(null);
-  }
-  
-  // Close current call
-  if (currentCall) {
-    try {
-      currentCall.close();
-    } catch (error) {
-      console.error('Error closing current call:', error);
+
+  const getDataLabelPosition = () => {
+    const positions = {
+      top: "top",
+      inside: "inside",
+      outside: "outside", 
+      center: "center",
+      bottom: "bottom"
     }
+    return positions[dataLabelPosition] || "top"
   }
 
-  // Stop all media streams
-  if (localStream) {
-    localStream.getTracks().forEach(track => {
-      track.stop();
-      console.log('Stopped local track:', track.kind);
-    });
-  }
-
-  if (remoteStream) {
-    remoteStream.getTracks().forEach(track => {
-      track.stop();
-      console.log('Stopped remote track:', track.kind);
-    });
-  }
-
-  // Clear video elements
-  if (localVideoRef.current) {
-    localVideoRef.current.srcObject = null;
-  }
-  if (remoteVideoRef.current) {
-    remoteVideoRef.current.srcObject = null;
-  }
-
-  // Reset all call-related states
-  setLocalStream(null);
-  setRemoteStream(null);
-  setCurrentCall(null);
-  setIsInCall(false);
-  setIsCallConnected(false);
-  setShowCallModal(false);
-  setCallType(null);
-  setIncomingCallType(null);
-  setCallDuration(0);
-  setCallStatus('');
-  setIsScreenSharing(false);
-  setIsCallFullscreen(false);
-  setIsVideoEnabled(true);
-  setIsAudioEnabled(true);
-  setCallMetadata(null);
-  setIsInitiatingCall(false);
+const handleBarClick = (data, index, event) => {
+  if (!data || !data.payload) return
   
-  console.log('Call ended and cleaned up completely');
-};
-
-// 9. Enhanced peer initialization with better error handling
-const initializePeer = () => {
-  if (!userData?.userEmail) {
-    console.error('User email not available for peer initialization');
-    return;
-  }
+  const clickedData = data.payload
+  const selectedCategory = clickedData.combinedKey || clickedData.name
   
-  const peerId = convertEmailToPeerId(userData.userEmail.toLowerCase());
-  console.log('Initializing peer:', { userEmail: userData.userEmail, peerId });
+  // Get the primary Y-axis field (first selected field)
+  const primaryField = selectedYAxes[0]
+  if (!primaryField) return
   
-  // Destroy existing peer
-  if (peer && !peer.destroyed) {
-    peer.destroy();
-  }
+  const fieldValue = clickedData[primaryField]
   
-  const peerInstance = new window.Peer(peerId, {
-    host: '0.peerjs.com',
-    port: 443,
-    path: '/',
-    secure: true,
-    debug: 1, // Reduced debug level for cleaner logs
-    config: {
-      'iceServers': [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:global.stun.twilio.com:3478' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-      ]
-    }
-  });
-
-  peerInstance.on('open', (id) => {
-    console.log('✅ Peer connected successfully with ID:', id);
-    setPeer(peerInstance);
-  });
-
-  peerInstance.on('call', handleIncomingCall);
-
-  peerInstance.on('error', (error) => {
-    console.error('❌ Peer error:', error);
-    
-    if (error.type === 'peer-destroyed') {
-      console.log('🔄 Peer destroyed, reconnecting...');
-      setTimeout(() => {
-        initializePeer();
-      }, 2000);
-    } else {
-      let errorMessage = 'Connection error. Please refresh and try again.';
-      if (error.type === 'unavailable-id') {
-        errorMessage = 'Your session has expired. Please refresh the page.';
+  // Navigate to chart details page with drill-down data
+  navigate('/Chartdetails', {
+    state: {
+      dashboardId: DashBoardID,
+      chartNo: ChartNo,
+      chartTitle: customTitle,
+      selectedCategory: selectedCategory, // The clicked category value
+      filterField: primaryField, // The field being filtered on
+      filterValue: fieldValue, // The value being filtered
+      xAxisFields: selectedXAxes, // Array of X-axis fields for filter construction
+      yAxisFields: selectedYAxes, // Array of Y-axis fields for reference
+      // Additional context for filtering
+      filterContext: {
+        rangeMin: rangeMin,
+        rangeMax: rangeMax,
+        selectedRangeField: selectedRangeField,
+        selectedCategories: selectedCategories,
+        displayFormat: displayFormat
       }
-      setCallError(errorMessage);
-      setShowCallError(true);
     }
-  });
-
-  peerInstance.on('disconnected', () => {
-    console.log('⚠️ Peer disconnected, attempting to reconnect...');
-    setTimeout(() => {
-      if (!peerInstance.destroyed) {
-        peerInstance.reconnect();
-      }
-    }, 1000);
-  });
-
-  peerInstance.on('connection', (conn) => {
-    console.log('🔗 Data connection established with:', conn.peer);
-  });
-};
-
-// 10. Enhanced UI components with proper call type display
-
-// Enhanced CallStatusDisplay with better status messages
-const CallStatusDisplay = () => {
-  const getStatusText = () => {
-    switch (callStatus) {
-      case 'calling':
-        return isRinging && !isCallConnected ? `Ringing ${selectedUser}...` : `Calling ${selectedUser}...`;
-      case 'connecting':
-        return 'Connecting...';
-      case 'connected':
-        return formatCallDuration(callDuration);
-      case 'failed':
-        return 'Call failed';
-      case 'ended':
-        return 'Call ended';
-      case 'offline':
-        return 'User offline';
-      case 'no-answer':
-        return 'No answer';
-      case 'incoming':
-        return `Incoming ${incomingCallType || callType} call...`;
+  })
+}
+  const getChartTypeIcon = (type) => {
+    switch (type) {
+      case "bar":
+        return <BarChart3 className="h-4 w-4" />
+   case "stackedBar":
+    case "horizontalBar":
+    case "horizontalStackedBar":
+      return <BarChart4 className="h-4 w-4" />
+      case "line":
+        return <Activity className="h-4 w-4" />
+      case "area":
+        return <AreaChartIcon className="h-4 w-4" />
+      case "pie":
+      case "donut":
+        return <PieChartIcon className="h-4 w-4" />
+        case "stackedPie":
+  return <PieChartIcon className="h-4 w-4" />
       default:
-        return '';
+        return <BarChart3 className="h-4 w-4" />
     }
-  };
+  }
 
-  const getStatusColor = () => {
-    switch (callStatus) {
-      case 'calling':
-      case 'connecting':
-      case 'incoming':
-        return 'text-blue-400';
-      case 'connected':
-        return 'text-green-400';
-      case 'failed':
-      case 'offline':
-      case 'no-answer':
-        return 'text-red-400';
-      case 'ended':
-        return 'text-gray-400';
-      default:
-        return 'text-gray-400';
-    }
-  };
+  const CustomTooltip = ({ active, payload, label }) => {
+  if (!showTooltip || !active || !payload || !payload.length) return null
+  
+  return (
+    <div className="bg-white dark:bg-slate-800 p-3 border rounded-lg shadow-lg max-w-xs">
+      <p className="font-medium mb-2 text-sm break-words">{label}</p>
+      {payload.map((entry, index) => (
+        <p key={index} className="text-sm">
+          <span style={{ color: entry.color }}>●</span>
+          {` ${formatFieldName(entry.dataKey || entry.name)}: ${formatValue(entry.value, entry.dataKey || entry.name)}`}
+        </p>
+      ))}
+    </div>
+  )
+}
+
+  // Custom label function for pie/donut charts
+ const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name, value, dataKey }) => {
+  if (!showPieLabels) return null
+  
+  const RADIAN = Math.PI / 180
+  const radius = outerRadius + 30
+  const x = cx + radius * Math.cos(-midAngle * RADIAN)
+  const y = cy + radius * Math.sin(-midAngle * RADIAN)
 
   return (
-    <div className="text-center">
-      <p className={`text-sm ${getStatusColor()}`}>
-        {getStatusText()}
-      </p>
-      {(callStatus === 'calling' || callStatus === 'connecting' || callStatus === 'incoming') && (
-        <div className="flex justify-center mt-2">
-          {isRinging || callStatus === 'incoming' ? (
-            <div className="flex space-x-1">
-              <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
-              <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-              <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-            </div>
-          ) : (
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-400"></div>
-          )}
+    <text 
+      x={x} 
+      y={y} 
+      fill="currentColor" 
+      textAnchor={x > cx ? 'start' : 'end'} 
+      dominantBaseline="central"
+      fontSize={fontSize}
+      className="fill-foreground"
+    >
+      {`${name}: ${formatValue(value, dataKey || name)} (${(percent * 100).toFixed(1)}%)`}
+    </text>
+  )
+}
+
+  const exportChartData = () => {
+    const csvContent = [
+      // Headers
+      ['Category', ...selectedYAxes.map(formatFieldName)].join(','),
+      // Data rows
+      ...chartData.map(row => [
+        row.combinedKey,
+        ...selectedYAxes.map(field => row[field] || 0)
+      ].join(','))
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${customTitle.replace(/\s+/g, '_')}_data.csv`
+    a.click()
+    window.URL.revokeObjectURL(url)
+  }
+
+  const renderChart = () => {
+    const commonProps = {
+      data: chartData,
+      margin: chartType === "horizontalBar" 
+        ? { top: 20, right: 30, left: 100, bottom: 20 }
+        : { top: 20, right: 30, left: 20, bottom: 100 }
+    }
+
+    const xAxisProps = chartType === "horizontalBar" 
+      ? {
+          type: "number",
+          tickLine: false,
+          axisLine: false,
+          fontSize: fontSize,
+          tickFormatter: formatValue
+        }
+      : {
+          dataKey: "combinedKey",
+          tickLine: false,
+          axisLine: false,
+          tickMargin: 10,
+          fontSize: fontSize,
+          angle: -45,
+          textAnchor: "end",
+          height: 120,
+          tickFormatter: (value) => {
+            return String(value).length > 30 
+              ? String(value).substring(0, 30) + "..." 
+              : String(value)
+          }
+        }
+
+    const yAxisProps = chartType === "horizontalBar"
+      ? {
+          type: "category",
+          dataKey: "combinedKey",
+          tickLine: false,
+          axisLine: false,
+          fontSize: fontSize,
+          width: 100,
+          tickFormatter: (value) => {
+            return String(value).length > 15 
+              ? String(value).substring(0, 15) + "..." 
+              : String(value)
+          }
+        }
+      : {
+          tickLine: false,
+          axisLine: false,
+          fontSize: fontSize,
+          tickFormatter: formatValue,
+          grid: showGrid
+        }
+
+    switch (chartType) {
+      case "bar":
+        return (
+          <BarChart {...commonProps} barGap={barGap}>
+            <XAxis {...xAxisProps} />
+            <YAxis {...yAxisProps} />
+            {showTooltip && <Tooltip content={<CustomTooltip />} />}
+            
+            {selectedYAxes.length > 1 && showLegend && (
+              <Legend 
+                formatter={(value) => formatFieldName(value)}
+                wrapperStyle={{ paddingTop: "20px", fontSize: `${legendFontSize}px` }}
+                layout={legendPosition === "left" || legendPosition === "right" ? "vertical" : "horizontal"}
+                align={legendPosition === "left" ? "left" : legendPosition === "right" ? "right" : "center"}
+                verticalAlign={legendPosition === "top" ? "top" : "bottom"}
+              />
+            )}
+
+            {selectedYAxes.map((field, index) => (
+              <Bar 
+                key={field}
+                dataKey={field} 
+                fill={getFieldColor(index)}
+                radius={barRadius}
+                name={formatFieldName(field)}
+                onClick={handleBarClick}
+                style={{ cursor: 'pointer' }}
+              >
+                {showDataLabels && (
+                  <LabelList
+                    dataKey={field}
+                    position={getDataLabelPosition()}
+                    formatter={(value) => formatValue(value, field)}
+                    className="fill-foreground"
+                    fontSize={fontSize - 2}
+                  />
+                )}
+              </Bar>
+            ))}
+          </BarChart>
+        )
+       // Replace the horizontalBar case in your renderChart() function with this fixed version:
+
+{(chartType === "pie" || chartType === "donut" || getEffectiveChartType().includes("stacked")) && (
+  <div className="space-y-4">
+    <h5 className="font-medium text-sm">
+      {getEffectiveChartType().includes("stacked") ? 
+        `Stacked ${chartType === "donut" ? "Donut" : "Pie"} Options` : 
+        "Pie/Donut Options"
+      }
+    </h5>
+    
+    {getEffectiveChartType().includes("stacked") && (
+      <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg mb-4">
+        <p className="text-sm text-blue-700 dark:text-blue-300">
+          <strong>Auto-Stacked {chartType === "donut" ? "Donut" : "Pie"} Chart:</strong> Creates nested rings with multiple data series. 
+          Each Y-axis field creates a new ring automatically when multiple fields are selected.
+        </p>
+      </div>
+    )}
+    
+    {/* Rest of the pie/donut options remain the same */}
+    <div className="grid grid-cols-2 gap-4">
+      <div className="space-y-2">
+        <Label className="text-sm">Outer Radius:</Label>
+        <Input
+          type="number"
+          value={pieOuterRadius}
+          onChange={(e) => setPieOuterRadius(Number(e.target.value))}
+          min="50"
+          max="150"
+        />
+      </div>
+      
+      {(chartType === "donut" || getEffectiveChartType().includes("stacked")) && (
+        <div className="space-y-2">
+          <Label className="text-sm">Inner Radius:</Label>
+          <Input
+            type="number"
+            value={pieInnerRadius}
+            onChange={(e) => setPieInnerRadius(Number(e.target.value))}
+            min="0"
+            max="100"
+          />
         </div>
       )}
     </div>
-  );
-};
 
-
-// Add these state variables to track call type detection
-const [incomingCallType, setIncomingCallType] = useState(null); // 'audio' or 'video'
-
-
-
-// 4. Fixed answerCall function 
-
-// Call Error Modal Component
-const CallErrorModal = () => {
-  if (!showCallError || !callError) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-md mx-4">
-        <div className="text-center">
-          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900 mb-4">
-            <PhoneOff className="h-6 w-6 text-red-600 dark:text-red-400" />
-          </div>
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-            Call Failed
-          </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-            {callError}
-          </p>
-          <div className="flex space-x-3">
-            <Button
-              onClick={() => {
-                setShowCallError(false);
-                setCallError(null);
-              }}
-              variant="outline"
-              className="flex-1"
-            >
-              Close
-            </Button>
-            <Button
-              onClick={() => {
-                setShowCallError(false);
-                setCallError(null);
-                // Retry the call
-                startCall(callType);
-              }}
-              className="flex-1 bg-blue-600 hover:bg-blue-700"
-            >
-              Try Again
-            </Button>
-          </div>
-        </div>
+    <div className="grid grid-cols-2 gap-4">
+      <div className="space-y-2">
+        <Label className="text-sm">Start Angle:</Label>
+        <Input
+          type="number"
+          value={pieStartAngle}
+          onChange={(e) => setPieStartAngle(Number(e.target.value))}
+          min="0"
+          max="360"
+        />
+      </div>
+      
+      <div className="space-y-2">
+        <Label className="text-sm">End Angle:</Label>
+        <Input
+          type="number"
+          value={pieEndAngle}
+          onChange={(e) => setPieEndAngle(Number(e.target.value))}
+          min="0"
+          max="360"
+        />
       </div>
     </div>
-  );
-};
 
-
-// Add cleanup on component unmount
-useEffect(() => {
-  return () => {
-    if (peer && !peer.destroyed) {
-      peer.destroy();
-    }
-    if (localStream) {
-      localStream.getTracks().forEach(track => track.stop());
-    }
-  };
-}, []);
-
-
-// Add a new state to track peer instances and their usernames
-const [activePeers, setActivePeers] = useState(new Map());
-
-// Enhanced peer discovery - you might want to implement this with your backend
-const findActivePeerForUser = async (username) => {
-  // This is a placeholder - in a real app, you'd query your backend
-  // to find the active peer ID for a given username
-  return username; // Fallback to base username
-};
-
-  // Handle URL parameters to auto-select user
-  useEffect(() => {
-    const userFromUrl = searchParams.get('user');
-    if (userFromUrl && users.length > 0) {
-      const decodedUser = decodeURIComponent(userFromUrl);
-      handleMessageClick(decodedUser);
-      
-      const newSearchParams = new URLSearchParams(searchParams);
-      newSearchParams.delete('user');
-      navigate(`/chat?${newSearchParams.toString()}`, { replace: true });
-    }
-  }, [searchParams, users]);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [specificMessages, showMobileChat]);
-
-  // Call duration timer
-  useEffect(() => {
-    if (isCallConnected) {
-      callDurationRef.current = setInterval(() => {
-        setCallDuration(prev => prev + 1);
-      }, 1000);
-    } else {
-      if (callDurationRef.current) {
-        clearInterval(callDurationRef.current);
-      }
-    }
-
-    return () => {
-      if (callDurationRef.current) {
-        clearInterval(callDurationRef.current);
-      }
-    };
-  }, [isCallConnected]);
-
-  const scrollToBottom = () => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  const fetchUsersAndMessages = async () => {
-    const forTheUserName = { ForTheUserName: userData.userName };
-
-    try {
-      const msglist = await callSoapService(userData.clientURL, "IM_Get_ListOfUsers_Messages", forTheUserName);
-      const allUsers = await callSoapService(userData.clientURL, "IM_Get_All_Users", "");
-      
-      const activeUsers = allUsers.filter(
-        (user) => user.account_expired == null
-      );
-
-      setUsers(allUsers);
-      setFilteredUsers(activeUsers);
-
-      const statuses = {};
-      activeUsers.forEach((user) => {
-        statuses[user.user_name] = Math.random() > 0.3;
-      });
-      setOnlineStatus(statuses);
-
-      const statusMap = {};
-      msglist.forEach((msg) => {
-        statusMap[msg.ID] = Math.random() > 0.5 ? "read" : "delivered";
-      });
-      setMessageStatus(statusMap);
-
-      const listWithImages = await Promise.all(
-        msglist.map(async (msg) => {
-          try {
-            const empImg = {EmpNo: msg.EMP_NO};
-            const imageData = await callSoapService(userData.clientURL, "getpic_bytearray", empImg);
-
-            return {
-              ...msg,
-              assignedEmpImage: imageData
-                ? `data:image/jpeg;base64,${imageData}`
-                : "",
-            };
-          } catch {
-            return { ...msg, assignedEmpImage: "" };
-          }
-        })
-      );
-
-      setListOfMsg(listWithImages);
-      setFilteredMessages(listWithImages);
-    } catch (error) {
-      console.error("Failed to fetch user messages:", error);
-    }
-  };
-
-  const toggleVideo = () => {
-    if (localStream) {
-      const videoTrack = localStream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        setIsVideoEnabled(videoTrack.enabled);
-      }
-    }
-  };
-
-  const toggleAudio = () => {
-    if (localStream) {
-      const audioTrack = localStream.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        setIsAudioEnabled(audioTrack.enabled);
-      }
-    }
-  };
-
-  const toggleScreenShare = async () => {
-    if (!currentCall) return;
-
-    try {
-      if (isScreenSharing) {
-        // Stop screen sharing, return to camera
-        const constraints = {
-          video: callType === 'video',
-          audio: true
-        };
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        
-        // Replace tracks
-        const videoTrack = stream.getVideoTracks()[0];
-        if (videoTrack && currentCall.peerConnection) {
-          const sender = currentCall.peerConnection.getSenders().find(s => 
-            s.track && s.track.kind === 'video'
-          );
-          if (sender) {
-            await sender.replaceTrack(videoTrack);
-          }
-        }
-
-        setLocalStream(stream);
-        setIsScreenSharing(false);
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream;
-        }
-      } else {
-        // Start screen sharing
-        const screenStream = await navigator.mediaDevices.getDisplayMedia({
-          video: true,
-          audio: true
-        });
-
-        // Replace video track
-        const videoTrack = screenStream.getVideoTracks()[0];
-        if (videoTrack && currentCall.peerConnection) {
-          const sender = currentCall.peerConnection.getSenders().find(s => 
-            s.track && s.track.kind === 'video'
-          );
-          if (sender) {
-            await sender.replaceTrack(videoTrack);
-          }
-        }
-
-        // Handle screen share end
-        videoTrack.onended = () => {
-          toggleScreenShare(); // This will switch back to camera
-        };
-
-        setIsScreenSharing(true);
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = screenStream;
-        }
-      }
-    } catch (error) {
-      console.error('Error toggling screen share:', error);
-    }
-  };
-
-  const formatCallDuration = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const parseDotNetDate = (dotNetDateStr) => {
-    const match = /\/Date\((\d+)\)\//.exec(dotNetDateStr);
-    return match ? new Date(parseInt(match[1], 10)) : null;
-  };
-
-  const groupMessagesByDate = (messages) => {
-    const grouped = {};
-    messages.forEach((msg) => {
-      const dateObj = parseDotNetDate(msg.CREATED_ON);
-      let label = format(dateObj, "MMMM d, yyyy");
-      if (isToday(dateObj)) label = "Today";
-      else if (isYesterday(dateObj)) label = "Yesterday";
-
-      if (!grouped[label]) grouped[label] = [];
-      grouped[label].push({ ...msg, parsedDate: dateObj });
-    });
-    return grouped;
-  };
-
-  const handleMessageClick = async (createdUser) => {
-    setSelectedUser(createdUser);
-    setShowContactInfo(false);
-    const payload = {
-      FromUserName: userData.userName,
-      SentToUserName: createdUser,
-    };
-
-    try {
-      const spMessages = await callSoapService(userData.clientURL, "IM_Get_Specific_User_Messages", payload);
-      setSpecificMessages(spMessages);
-
-      const selectedUserObj = users.find((u) => u.user_name === createdUser);
-      if (selectedUserObj) {
-        const empImg = {EmpNo: selectedUserObj.emp_no};
-        const imageData = await callSoapService(userData.clientURL, "getpic_bytearray", empImg);
-        setSelectedUserImage(
-          imageData ? `data:image/jpeg;base64,${imageData}` : ""
-        );
-      } else {
-        setSelectedUserImage("");
-      }
-
-      setShowMobileChat(true);
-    } catch (err) {
-      console.error("Error fetching conversation:", err);
-    }
-  };
-
-  const handleSendMessage = async () => {
-    if (!newMessage.trim() || !selectedUser) return;
-
-    const sentMsg = {
-      UserName: userData.userName,
-      ToUserName: selectedUser,
-      Message: newMessage,
-      MessageInfo: newMessage,
-    };
-
-    try {
-      await sentMessage(sentMsg, userData.userEmail, userData.clientURL);
-
-      const payload = {
-        FromUserName: userData.userName,
-        SentToUserName: selectedUser,
-      };
-
-      const updatedMessages = await getSpecificUserMessage(
-        payload,
-        userData.userEmail,
-        userData.clientURL
-      );
-
-      setSpecificMessages(updatedMessages);
-      setNewMessage("");
-
-      if (updatedMessages.length > 0) {
-        const newMsg = updatedMessages[updatedMessages.length - 1];
-        setMessageStatus((prev) => ({
-          ...prev,
-          [newMsg.ID]: "sent",
-        }));
-
-        setTimeout(() => {
-          setMessageStatus((prev) => ({
-            ...prev,
-            [newMsg.ID]: "delivered",
-          }));
-        }, 1000);
-
-        setTimeout(() => {
-          setMessageStatus((prev) => ({
-            ...prev,
-            [newMsg.ID]: "read",
-          }));
-        }, 3000);
-      }
-    } catch (err) {
-      console.error("Error sending message:", err);
-    }
-  };
-
-  const handleFileUpload = (type) => {
-    let inputRef;
-    switch (type) {
-      case "image":
-        inputRef = imageInputRef;
-        break;
-      case "video":
-        inputRef = videoInputRef;
-        break;
+    <div className="flex items-center space-x-2">
+      <Checkbox
+        id="showPieLabels"
+        checked={showPieLabels}
+        onCheckedChange={setShowPieLabels}
+      />
+      <Label htmlFor="showPieLabels" className="text-sm">
+        {getEffectiveChartType().includes("stacked") ? "Show Labels (Outer Ring Only)" : "Show Pie Labels"}
+      </Label>
+    </div>
+  </div>
+)}
       default:
-        inputRef = fileInputRef;
+        return null
     }
+  }
 
-    inputRef.current.click();
-    setShowAttachmentMenu(false);
-  };
-
-  const handleFileChange = (e, type) => {
-    const file = e.target.files[0];
-    if (file) {
-      console.log(`${type} selected:`, file.name);
-    }
-  };
-
-  const toggleRecording = () => {
-    setIsRecording(!isRecording);
-  };
-
-  const toggleMute = () => {
-    setIsMuted(!isMuted);
-  };
-
-  const renderStatusIcon = (messageId) => {
-    const status = messageStatus[messageId] || "sent";
-
-    switch (status) {
-      case "read":
-        return <CheckCheck className="w-3 h-3 text-blue-500" />;
-      case "delivered":
-        return <CheckCheck className="w-3 h-3 text-gray-400" />;
-      case "sent":
-        return <Check className="w-3 h-3 text-gray-400" />;
-      default:
-        return null;
-    }
-  };
-
-const AudioVideoElement = ({ stream, muted = false, className = "", isAudioOnly = false }) => {
-  const videoRef = useRef(null);
-  
-  useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
-      videoRef.current.muted = muted;
-      
-      // For audio-only calls, ensure audio plays
-      if (isAudioOnly && !muted) {
-        videoRef.current.volume = 1.0;
-        videoRef.current.play().catch(console.error);
-      }
-    }
-  }, [stream, muted, isAudioOnly]);
-
-  return (
-    <video
-      ref={videoRef}
-      autoPlay
-      playsInline
-      muted={muted}
-      className={`${className} ${isAudioOnly ? 'hidden' : ''}`}
-      style={{ 
-        width: '100%', 
-        height: '100%',
-        objectFit: 'cover'
-      }}
-    />
-  );
-};
-const CallModalIncomingSection = () => {
-  const getCallTypeIcon = (type) => {
-    return type === 'audio' ? Phone : VideoIcon;
-  };
-
-  const getCallTypeLabel = (type) => {
-    return type === 'audio' ? 'Audio Call' : 'Video Call';
-  };
-
-  const getGradientClass = (type) => {
-    return type === 'audio' 
-      ? 'from-green-500 to-blue-600' 
-      : 'from-blue-500 to-purple-600';
-  };
-
-  // Only render if there's an incoming call and we're not in a call yet
-  if (!incomingCall || isInCall) return null;
-
-  return (
-    <div className={`p-8 text-center bg-gradient-to-br ${getGradientClass(incomingCallType)} text-white rounded-lg`}>
-      <div className="mb-6">
-        {/* Dynamic call type icon */}
-        <div className="relative mx-auto w-24 h-24 mb-6 bg-white/20 rounded-full flex items-center justify-center">
-          {React.createElement(getCallTypeIcon(incomingCallType), {
-            className: "w-12 h-12 text-white animate-pulse"
-          })}
-          <div className="absolute inset-0 rounded-full border-4 border-white opacity-30 animate-ping"></div>
-          <div className="absolute inset-0 rounded-full border-4 border-white opacity-20 animate-ping" style={{animationDelay: '0.5s'}}></div>
-        </div>
-
-        <h3 className="text-2xl font-bold mb-2">
-          {incomingCall.callerUsername || 'Unknown User'}
+return (
+<Card className="w-full bg-white dark:bg-slate-950 border shadow-sm">
+  <CardHeader className="p-2 sm:p-4">
+    {/* Top row: Title and Controls */}
+  <div className="flex flex-wrap gap-4 items-center justify-between">
+      {/* Title and Display Format */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center min-w-0 flex-shrink">
+        <h3 className="text-lg sm:text-xl font-bold truncate flex flex-col gap-1 ">     
+          {chartTitle}
+          <span className="text-sm">CurrencyType:{userData.companyCurrName}</span>
         </h3>
-        <p className="text-white/80 text-lg mb-2 flex items-center justify-center">
-          {React.createElement(getCallTypeIcon(incomingCallType), {
-            className: "w-5 h-5 mr-2"
-          })}
-          Incoming {getCallTypeLabel(incomingCallType).toLowerCase()}...
-        </p>
-        
-        {/* Enhanced status display */}
-        <div className="flex justify-center items-center space-x-2 mb-4">
-          <div className="flex space-x-1">
-            <div className="w-2 h-2 bg-white rounded-full animate-bounce"></div>
-            <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-            <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-          </div>
-        </div>
-      
-        {/* Debug info (remove in production) */}
-        {incomingCall.metadata && (
-          <div className="text-white/40 text-xs mb-2">
-            Detected: {incomingCall.metadata.type || 'unknown'} call
-          </div>
-        )}
+       
       </div>
       
-      {/* Action buttons */}
-      <div className="flex justify-center space-x-8">
-        <button
-          onClick={rejectCall}
-          className="bg-red-500 hover:bg-red-600 text-white rounded-full p-6 shadow-lg transform hover:scale-105 transition-all duration-200"
-          title={`Decline ${incomingCallType} call`}
-        >
-          <PhoneOff className="w-8 h-8" />
-        </button>
-        <button
-          onClick={answerCall}
-          className="bg-green-500 hover:bg-green-600 text-white rounded-full p-6 shadow-lg transform hover:scale-105 transition-all duration-200 animate-pulse"
-          title={`Answer ${incomingCallType} call`}
-        >
-          {React.createElement(getCallTypeIcon(incomingCallType), {
-            className: "w-8 h-8"
-          })}
-        </button>
+      {/* Chart Type and Action Buttons */}
+      <div className="flex flex-wrap gap-2 items-center justify-between sm:justify-between min-w-fit">
+     
       </div>
     </div>
-  );
-};
 
-// Updated CallModal component - cleaned up with single incoming call UI
-const CallModal = () => {
-  if (!showCallModal) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-      <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl ${
-        isCallFullscreen ? 'w-full h-full' : 'w-96 max-w-lg'
-      }`}>
+    <div className="space-y-4 mb-4 sm:mb-6 flex flex-row gap-2 items-center justify-between flex-wrap">
+       
+      {/* Single line: X-Axis, Y-Axis, and Range */}
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
         
-        {/* Incoming Call UI - Using the single component */}
-        <CallModalIncomingSection />
-
-        {/* Active call UI */}
-        {isInCall && (
-          <div className={`relative ${isCallFullscreen ? 'h-full' : 'h-96'}`}>
-            {/* Call header */}
-            <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/50 to-transparent z-10">
-              <div className="flex justify-between items-center text-white">
-                <div className="flex items-center space-x-2">
-                  {callType === 'audio' && <Phone className="w-5 h-5" />}
-                  {callType === 'video' && <VideoIcon className="w-5 h-5" />}
-                  <div>
-                    <h3 className="font-semibold text-lg">{selectedUser}</h3>
-                    <CallStatusDisplay />
-                  </div>
-                </div>
-                <div className="flex space-x-2">
-                  <Button
-                    onClick={() => setIsCallFullscreen(!isCallFullscreen)}
-                    variant="ghost"
-                    size="icon"
-                    className="text-white hover:bg-white/10"
-                  >
-                    {isCallFullscreen ? (
-                      <Minimize2 className="w-5 h-5" />
-                    ) : (
-                      <Maximize2 className="w-5 h-5" />
-                    )}
-                  </Button>
-                </div>
-              </div>
+       
+      {/* X-Axis Selection */}
+        <div className="flex-1 space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="p-1 bg-blue-100 dark:bg-blue-900 rounded flex-shrink-0">
+              <BarChart3 className="h-3 w-3 text-blue-600 dark:text-blue-400" />
             </div>
-
-            {/* Video streams with proper audio handling */}
-            {callType === 'video' && (
-              <div className="relative w-full h-full bg-gray-900">
-                {/* Remote video with audio */}
-                <AudioVideoElement 
-                  stream={remoteStream}
-                  muted={false}
-                  className="w-full h-full object-cover"
-                />
-                
-                {/* Local video (muted to prevent echo) */}
-                <div className="absolute bottom-20 right-4 w-32 h-24 bg-gray-800 rounded-lg overflow-hidden">
-                  <AudioVideoElement 
-                    stream={localStream}
-                    muted={true}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-
-                {/* Call status overlay */}
-                {callStatus !== 'connected' && (
-                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                    <div className="text-center text-white">
-                      <div className="relative mb-6">
-                        <Avatar className="w-32 h-32 mx-auto border-4 border-white shadow-lg">
-                          <AvatarImage src={selectedUserImage} />
-                          <AvatarFallback className="bg-gray-600 text-white text-4xl">
-                            {selectedUser?.charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        {isRinging && (
-                          <>
-                            <div className="absolute inset-0 rounded-full border-4 border-white opacity-30 animate-ping"></div>
-                            <div className="absolute inset-0 rounded-full border-4 border-white opacity-20 animate-ping" style={{animationDelay: '0.5s'}}></div>
-                          </>
-                        )}
-                      </div>
-                      <CallStatusDisplay />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Audio call UI */}
-            {callType === 'audio' && (
-              <div className="relative w-full h-full">
-                {/* Hidden audio element for audio-only calls */}
-                {remoteStream && (
-                  <AudioVideoElement 
-                    stream={remoteStream}
-                    muted={false}
-                    className="hidden"
-                  />
-                )}
-                
-                <div className="flex flex-col items-center justify-center h-full bg-gradient-to-br from-green-500 to-blue-600 text-white">
-                  {/* Audio call icon */}
-                 
-                  
-                  <div className="relative mb-8">
-                    <Avatar className="w-40 h-40 border-4 border-white shadow-lg">
-                      <AvatarImage src={selectedUserImage} />
-                      <AvatarFallback className="bg-white/20 text-white text-5xl font-bold">
-                        {selectedUser?.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                  </div>
-                  
-                  <h3 className="text-3xl font-bold mb-2">{selectedUser}</h3>
-                  <p className="text-white/80 text-lg mb-4 flex items-center">
-                    <Phone className="w-5 h-5 mr-2" />
-                    Audio Call
-                  </p>
-                 
-                </div>
-              </div>
-            )}
-
-            {/* Call controls */}
-            {(callStatus !== 'failed' && callStatus !== 'offline' && callStatus !== 'no-answer') && (
-              <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/60 to-transparent">
-                <div className="flex justify-center space-x-6">
-                  {callType === 'video' && (
-                    <Button
-                      onClick={toggleVideo}
-                      className={`rounded-full p-4 transition-all duration-200 ${
-                        isVideoEnabled 
-                          ? 'bg-gray-600 hover:bg-gray-700' 
-                          : 'bg-red-500 hover:bg-red-600'
-                      } text-white shadow-lg`}
-                    >
-                      {isVideoEnabled ? (
-                        <VideoIcon className="w-6 h-6" />
-                      ) : (
-                        <VideoOff className="w-6 h-6" />
-                      )}
-                    </Button>
-                  )}
-                  
-                  <Button
-                    onClick={toggleAudio}
-                    className={`rounded-full p-4 transition-all duration-200 ${
-                      isAudioEnabled 
-                        ? 'bg-gray-600 hover:bg-gray-700' 
-                        : 'bg-red-500 hover:bg-red-600'
-                    } text-white shadow-lg`}
-                  >
-                    {isAudioEnabled ? (
-                      <Mic className="w-6 h-6" />
-                    ) : (
-                      <VolumeX className="w-6 h-6" />
-                    )}
-                  </Button>
-
-                  {callType === 'video' && isCallConnected && (
-                    <Button
-                      onClick={toggleScreenShare}
-                      className={`rounded-full p-4 transition-all duration-200 ${
-                        isScreenSharing 
-                          ? 'bg-blue-500 hover:bg-blue-600' 
-                          : 'bg-gray-600 hover:bg-gray-700'
-                      } text-white shadow-lg`}
-                    >
-                      {isScreenSharing ? (
-                        <MonitorOff className="w-6 h-6" />
-                      ) : (
-                        <Monitor className="w-6 h-6" />
-                      )}
-                    </Button>
-                  )}
-
-                  <Button
-                    onClick={endCall}
-                    className="bg-red-500 hover:bg-red-600 text-white rounded-full p-4 shadow-lg transform hover:scale-105 transition-all duration-200"
-                  >
-                    <PhoneOff className="w-6 h-6" />
-                  </Button>
-                </div>
-              </div>
-            )}
+            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+              X-Axis
+            </label>
           </div>
-        )}
-      </div>
-    </div>
-  );
-};
-  return (
-    <div className="flex h-[75vh]  bg-[#f0f2f5] dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm">
-      {/* Left sidebar - Contacts */}
-      <CallModal />
-      <div
-        className={`${
-          showMobileChat ? "hidden md:flex" : "flex"
-        } w-full md:w-1/3 flex-col border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 relative`}
-      >
-        {/* User header */}
-        <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center space-x-3">
-            <Avatar className="h-10 w-10">
-              <AvatarImage
-                src={userData.userAvatar}
-                alt={userData.userName}
-              />
-              <AvatarFallback className="bg-blue-500 text-white font-medium">
-                {userData.userName.charAt(0).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <span className="font-medium text-gray-800 dark:text-gray-100">
-              {userData.userName}
-            </span>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="rounded-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-        </div>
- 
-        {/* Search bar - Unified for both views */}
-        <div className="p-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder={
-                showUserList ? "Search contacts" : "Search conversations"
-              }
-              className="pl-10 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 focus-visible:ring-2 focus-visible:ring-blue-500"
-              value={showUserList ? userSearchTerm : messageSearchTerm}
-              onChange={(e) => {
-                const val = e.target.value;
-                if (showUserList) {
-                  setUserSearchTerm(val);
-                  setFilteredUsers(
-                    users.filter(
-                      (user) =>
-                        user.account_expired == null &&
-                        user.user_name.toLowerCase().includes(val.toLowerCase())
-                    )
-                  );
-                } else {
-                  setMessageSearchTerm(val);
-                  setFilteredMessages(
-                    listOfMsg.filter(
-                      (msg) =>
-                        msg.CREATED_USER &&
-                        msg.CREATED_USER.toLowerCase().includes(
-                          val.toLowerCase()
-                        )
-                    )
-                  );
-                }
-              }}
-            />
-          </div>
-        </div>
- 
-        {/* Dynamic content area with improved scrollbar */}
-        <div className="flex-1 relative overflow-hidden">
-          {/* Contacts list */}
-          <ScrollArea
-            className={`h-full w-full ${showUserList ? "hidden" : "block"}`}
-          >
-            <div className="divide-y divide-gray-200 dark:divide-gray-700">
-              {filteredMessages
-                .filter((msg) => msg.CREATED_USER !== userData.userName)
-                .map((msg, index) => (
-                  <div
-                    key={index}
-                    className={`flex items-center gap-3 p-3 cursor-pointer transition-colors ${
-                      selectedUser === msg.CREATED_USER
-                        ? "bg-gray-100 dark:bg-gray-700"
-                        : "hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                    }`}
-                    onClick={() => handleMessageClick(msg.CREATED_USER)}
-                  >
-                    <div className="relative">
-                      <Avatar className="h-9 w-9">
-                        <AvatarImage src={msg.assignedEmpImage} />
-                        <AvatarFallback className="bg-blue-500 text-white font-medium">
-                          {msg.CREATED_USER.charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      {/* {onlineStatus[msg.CREATED_USER] && (
-                        <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"></div>
-                      )} */}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-center">
-                        <p className="font-medium text-gray-800 dark:text-gray-100 text-sm truncate">
-                          {msg.CREATED_USER}
-                        </p>
-                        <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                          {format(parseDotNetDate(msg.CREATED_ON), "h:mm a")}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center mt-0.5">
-                        <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                          {msg.TASK_INFO}
-                        </p>
-                        {msg.ASSIGNED_USER === userData.userName && (
-                          <span className="ml-2">
-                            {renderStatusIcon(msg.ID)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button 
+                variant="outline" 
+                className="w-full justify-between bg-white dark:bg-slate-950 shadow-sm hover:shadow-md transition-shadow text-xs h-9"
+              >
+                <span className="truncate">
+                  {selectedXAxes.length > 0 ? selectedXAxes.map(field => formatFieldName(field)).join(', ') : 'Select'}
+                </span>
+                <ChevronDown className="h-3 w-3 flex-shrink-0" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[320px] sm:w-96" align="start">
+              <div className="space-y-4">
+                {/* Field Selection Section */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium text-xs">Select Text/String Fields</h4>
+                    <Badge variant="secondary" className="text-xs">
+                      {textFields.length}
+                    </Badge>
                   </div>
-                ))}
-            </div>
-          </ScrollArea>
- 
-          {/* User list for new chat */}
-          <ScrollArea
-            className={`h-full w-full ${showUserList ? "block" : "hidden"}`}
-          >
-            <div className="divide-y divide-gray-200 dark:divide-gray-700">
-              {filteredUsers
-                .filter((user) => user.user_name !== userData.userName)
-                .map((user, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center gap-3 p-2  hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors"
-                    onClick={() => {
-                      handleMessageClick(user.user_name);
-                      setShowUserList(false);
-                      setShowMobileChat(true);
-                    }}
-                  >
-                    <Avatar className="h-9 w-9">
-                      <AvatarFallback className="bg-blue-500 text-white text-lg font-medium">
-                        {user.user_name.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-800 dark:text-gray-100 text-sm truncate">
-                        {user.user_name}
-                      </p>
-                     
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </ScrollArea>
-        </div>
- 
-        {/* Unified toggle button */}
-        <div className="absolute bottom-6 right-6">
-          <Button
-            size="icon"
-            className="rounded-full h-12 w-12 shadow-lg bg-blue-600 hover:bg-blue-700 text-white transition-transform hover:scale-105"
-            onClick={() => setShowUserList(!showUserList)}
-          >
-            {showUserList ? (
-              <MessageSquare className="h-5 w-5" />
-            ) : (
-              <Plus className="h-5 w-5" />
-            )}
-          </Button>
-        </div>
-      </div>
- 
-      {/* Right side - Chat area */}
-      <div
-        className={`${
-          !showMobileChat ? "hidden md:flex" : "flex"
-        } flex-1 flex-col bg-white dark:bg-gray-900 relative`}
-      >
-        {selectedUser ? (
-          <>
-            {/* Chat header */}
-            <div className="flex justify-between items-center md:p-3 p-1  bg-[#f0f2f5] dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-              <div className="flex items-center md:space-x-3 space-x-1">
-                <button
-                  className="md:hidden p-1 md:mr-2  text-gray-600 dark:text-gray-300"
-                  onClick={() => setShowMobileChat(false)}
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                </button>
-                <div className="relative">
-                  <Avatar>
-                    <AvatarImage src={selectedUserImage} />
-                    <AvatarFallback className="bg-gray-400 dark:bg-gray-600 text-white">
-                      {selectedUser.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  {/* {onlineStatus[selectedUser] && (
-                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"></div>
-                  )} */}
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium text-sm text-gray-800 dark:text-white">
-                    {selectedUser}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {/* {onlineStatus[selectedUser]
-                      ? "Active now"
-                      : "Active Recently"} */}
-                  </p>
-                </div>
-              </div>
-              <div className="flex md:space-x-4 space-x-1 text-gray-500 dark:text-gray-400">
-                 <button 
-    className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-    onClick={() => startCall('audio')}
-    disabled={!peer}
-    title="Audio call"
-  >
-    <Phone className="w-5 h-5" />
-  </button>
-  <button 
-    className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-    onClick={() => startCall('video')}
-    disabled={!peer}
-    title="Video call"
-  >
-    <VideoIcon className="w-5 h-5" />
-  </button>
-                <button
-                  className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-                  onClick={() => setShowContactInfo(true)}
-                >
-                  <Info className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
- 
-            {/* Messages area */}
-            <div className="flex-1 p-4 overflow-y-auto bg-[#e5ddd5] dark:bg-gray-900 bg-opacity-30">
-              {Object.entries(groupMessagesByDate(specificMessages)).map(
-                ([dateLabel, msgs], idx) => (
-                  <div key={idx} className="mb-6">
-                    <div className="text-center mb-4">
-                      <span className="bg-white dark:bg-gray-700 px-3 py-1 rounded-full text-xs text-gray-600 dark:text-gray-300 shadow-sm">
-                        {dateLabel}
-                      </span>
-                    </div>
-                    {msgs.map((msg, i) => {
-                      const isSender =
-                        msg.ASSIGNED_USER !== userData.userName;
-                      const time = format(
-                        parseDotNetDate(msg.CREATED_ON),
-                        "h:mm a"
-                      );
-                      return (
-                        <div
-                          key={i}
-                          className={`flex mb-4 ${
-                            isSender ? "justify-end" : "justify-start"
-                          }`}
-                        >
-                          <div
-                            className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                              isSender
-                                ? "bg-[#d9fdd3] dark:bg-blue-600 rounded-tr-none"
-                                : "bg-white dark:bg-gray-700 rounded-tl-none"
-                            } shadow`}
-                          >
-                            <div className="text-sm dark:text-white">
-                              {msg.TASK_INFO}
-                            </div>
-                            <div
-                              className={`text-xs mt-1 flex justify-end items-center space-x-1 ${
-                                isSender
-                                  ? "text-gray-500 dark:text-blue-100"
-                                  : "text-gray-500 dark:text-gray-400"
-                              }`}
+                  <ScrollArea className="h-32">
+                    <div className="space-y-2">
+                      {textFields.length > 0 ? (
+                        textFields.map(field => (
+                          <div key={`x-${field}`} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`x-${field}`}
+                              checked={selectedXAxes.includes(field)}
+                              onCheckedChange={(checked) => handleXAxisChange(field, checked)}
+                            />
+                            <label
+                              htmlFor={`x-${field}`}
+                              className="text-xs cursor-pointer flex-1 truncate"
                             >
-                              <span>{time}</span>
-                              {/* {isSender && (
-                                <span className="ml-1">
-                                  {renderStatusIcon(msg.ID)}
-                                </span>
-                              )} */}
-                            </div>
+                              {formatFieldName(field)}
+                            </label>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )
-              )}
-              <div ref={chatEndRef} />
-            </div>
- 
-            {/* Message input */}
-            <div className="p-3 bg-[#f0f2f5] dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-              <div className="flex items-center space-x-2">
-              
-              
-                <Input
-                  type="text"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      handleSendMessage();
-                    }
-                  }}
-                  placeholder="Type a message"
-                  className="flex-1 rounded-full bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white border border-gray-200 dark:border-gray-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                />
-                <button
-                  className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
-                  onClick={
-                    newMessage.trim() ? handleSendMessage : toggleRecording
-                  }
-                >
-                  {newMessage.trim() ? (
-                    <Send className="w-5 h-5 text-blue-500" />
-                  ) : isRecording ? (
-                    <div className="flex items-center">
-                      <div className="animate-pulse mr-1">
-                        <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                      </div>
-                      <X className="w-5 h-5 text-red-500" />
+                        ))
+                      ) : (
+                        <p className="text-xs text-muted-foreground text-center py-4">
+                          No text fields found
+                        </p>
+                      )}
                     </div>
-                  ) : (
-                    <Mic className="w-5 h-5" />
-                  )}
-                </button>
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="flex-1 flex flex-col items-center justify-center bg-white dark:bg-gray-900">
-            <div className="w-32 h-32 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-6">
-              <div className="w-16 h-16 text-gray-400 dark:text-gray-500">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                  />
-                </svg>
-              </div>
-            </div>
-            <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Start a conversation
-            </h3>
-            <p className="text-gray-500 dark:text-gray-400 text-center leading-relaxed text-sm max-w-md px-4">
-              Select a chat to start messaging. Your conversations will appear
-              here.
-            </p>
-          </div>
-        )}
- 
-        {/* Contact info panel */}
-        {showContactInfo && selectedUser && (
-          <div className="absolute inset-y-0 right-0 w-full md:w-1/3 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 shadow-lg">
-            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-              <div className="flex justify-between items-center">
-                <button
-                  className="p-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
-                  onClick={() => setShowContactInfo(false)}
-                >
-                  <X className="w-5 h-5" />
-                </button>
-                <h3 className="text-lg font-semibold dark:text-white">
-                  Contact info
-                </h3>
-                <div className="w-5"></div>
-              </div>
-            </div>
-            <ScrollArea className="h-full">
-              <div className="flex flex-col items-center p-6">
-                <Avatar className="w-32 h-32 mb-4">
-                  <AvatarImage src={selectedUserImage} />
-                  <AvatarFallback className="bg-gray-400 dark:bg-gray-600 text-white">
-                    {selectedUser.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <h4 className="text-xl font-semibold dark:text-white">
-                  {selectedUser}
-                </h4>
-                <p className="text-gray-500 dark:text-gray-400 mb-6">
-                  {onlineStatus[selectedUser] ? "Online" : "Offline"}
-                </p>
-                <div className="flex ">
-                  <button className="flex flex-col items-center p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
-                    <Phone className="w-6 h-6 text-blue-500 mb-1" />
-                    <span className="text-xs dark:text-gray-300">Audio</span>
-                  </button>
-                  <button className="flex flex-col items-center p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
-                    <VideoIcon className="w-6 h-6 text-blue-500 mb-1" />
-                    <span className="text-xs dark:text-gray-300">Video</span>
-                  </button>
-                  <button
-                    className="flex flex-col items-center p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
-                    onClick={toggleMute}
-                  >
-                    {isMuted ? (
-                      <VolumeX className="w-6 h-6 text-blue-500 mb-1" />
-                    ) : (
-                      <Volume2 className="w-6 h-6 text-blue-500 mb-1" />
-                    )}
-                    <span className="text-xs dark:text-gray-300">
-                      {isMuted ? "Unmute" : "Mute"}
-                    </span>
-                  </button>
+                  </ScrollArea>
                 </div>
+
+                {/* Category Filters Section - Only show if fields are selected */}
+                {selectedXAxes.length > 0 && Object.keys(availableCategories).length > 0 && (
+                  <>
+                    <Separator />
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1 bg-orange-100 dark:bg-orange-900 rounded flex-shrink-0">
+                          <Eye className="h-3 w-3 text-orange-600 dark:text-orange-400" />
+                        </div>
+                        <h4 className="font-medium text-xs">Category Filters</h4>
+                      </div>
+                      
+                      <ScrollArea className="h-48">
+                        <div className="space-y-3">
+                          {selectedXAxes.map(field => (
+                            <div key={`category-filter-${field}`} className="space-y-2 p-2 border rounded-md bg-gray-50 dark:bg-slate-900">
+                              <div className="flex items-center justify-between">
+                                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
+                                  {formatFieldName(field)}
+                                </label>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="secondary" className="text-xs">
+                                    {(selectedCategories[field] || []).length}/{(availableCategories[field] || []).length}
+                                  </Badge>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => selectAllCategories(field)}
+                                      className="text-xs h-5 px-1"
+                                    >
+                                      All
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => deselectAllCategories(field)}
+                                      className="text-xs h-5 px-1"
+                                    >
+                                      None
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <div className="max-h-24 overflow-y-auto">
+                                <div className="space-y-1">
+                                  {(availableCategories[field] || []).map(value => (
+                                    <div key={`${field}-${value}`} className="flex items-center space-x-2">
+                                      <Checkbox
+                                        id={`${field}-${value}`}
+                                        checked={(selectedCategories[field] || []).includes(value)}
+                                        onCheckedChange={(checked) => handleCategoryChange(field, value, checked)}
+                                      />
+                                      <label
+                                        htmlFor={`${field}-${value}`}
+                                        className="text-xs cursor-pointer flex-1 break-words"
+                                        title={value}
+                                      >
+                                        {String(value).length > 20 ? `${String(value).substring(0, 20)}...` : String(value)}
+                                      </label>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="text-xs text-muted-foreground text-center border-t pt-1">
+                                {(selectedCategories[field] || []).length} of {(availableCategories[field] || []).length} selected
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  </>
+                )}
               </div>
-            </ScrollArea>
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        {/* Y-Axis Selection */}
+        <div className="flex-1 space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="p-1 bg-green-100 dark:bg-green-900 rounded flex-shrink-0">
+              <TrendingUp className="h-3 w-3 text-green-600 dark:text-green-400" />
+            </div>
+            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+              Y-Axis
+            </label>
+          </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button 
+                variant="outline" 
+                className="w-full justify-between bg-white dark:bg-slate-950 shadow-sm hover:shadow-md transition-shadow text-xs h-9"
+              >
+                <span className="truncate">
+                  {selectedYAxes.length > 0 ? selectedYAxes.map(field => formatFieldName(field)).join(', ') : 'Select'}
+                </span>
+                <ChevronDown className="h-3 w-3 flex-shrink-0" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[280px] sm:w-80" align="start">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-xs">Select Numeric Fields</h4>
+                  <Badge variant="secondary" className="text-xs">
+                    {numericFields.length}
+                  </Badge>
+                </div>
+                <ScrollArea className="h-32">
+                  <div className="space-y-2">
+                    {numericFields.length > 0 ? (
+                      numericFields.map(field => (
+                        <div key={`y-${field}`} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`y-${field}`}
+                            checked={selectedYAxes.includes(field)}
+                            onCheckedChange={(checked) => handleYAxisChange(field, checked)}
+                          />
+                          <label
+                            htmlFor={`y-${field}`}
+                            className="text-xs cursor-pointer flex-1 truncate"
+                          >
+                            {formatFieldName(field)}
+                          </label>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-muted-foreground text-center py-4">
+                        No numeric fields found
+                      </p>
+                    )}
+                  </div>
+                </ScrollArea>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+    
+      </div>
+       {/* Range Slider - Inline */}
+      <div className="w-[200px]">
+            {selectedYAxes.length > 0 && selectedRangeField && (
+          <div className="flex-1 space-y-2">
+           
+            <div className="p-2 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-blue-700 dark:text-blue-300 truncate">
+                    {formatFieldName(selectedRangeField)}
+                  </span>
+                 <div className="flex items-center space-x-1 font-mono bg-white dark:bg-slate-800 px-1 py-1 rounded border text-xs">
+  <input
+    type="text"
+    value={rangeMin}
+    onChange={(e) => {
+      const raw = e.target.value;
+      const num = Number(raw);
+      if (!isNaN(num)) setRangeMin(num);
+    }}
+    className="w-10 bg-transparent text-blue-600 dark:text-blue-400 text-right outline-none"
+  />
+  <span className="text-gray-400">-</span>
+  <input
+    type="text"
+    value={rangeMax}
+    onChange={(e) => {
+      const raw = e.target.value;
+      const num = Number(raw);
+      if (!isNaN(num)) setRangeMax(num);
+    }}
+    className="w-10 bg-transparent text-blue-600 dark:text-blue-400 text-right outline-none"
+  />
+</div>
+
+                </div>
+                
+                {/* Compact Range Slider */}
+                <div className="relative w-full h-6 flex items-center" ref={sliderRef}>
+  <div className="absolute w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg shadow-inner"></div>
+  <div
+    className="absolute h-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg shadow-md"
+    style={{
+      left: `${valueToPercent(rangeMin)}%`,
+      width: `${valueToPercent(rangeMax) - valueToPercent(rangeMin)}%`
+    }}
+  ></div>
+  
+  {/* Min thumb */}
+  <div
+    className={`absolute w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-lg cursor-pointer transform -translate-x-1/2 z-20 transition-transform hover:scale-110 ${
+      isDragging.min ? 'scale-110' : ''
+    }`}
+    style={{ left: `${valueToPercent(rangeMin)}%` }}
+    onMouseDown={handleMouseDown('min')}
+  />
+  
+  {/* Max thumb */}
+  <div
+    className={`absolute w-4 h-4 bg-indigo-500 border-2 border-white rounded-full shadow-lg cursor-pointer transform -translate-x-1/2 z-20 transition-transform hover:scale-110 ${
+      isDragging.max ? 'scale-110' : ''
+    }`}
+    style={{ left: `${valueToPercent(rangeMax)}%` }}
+    onMouseDown={handleMouseDown('max')}
+  />
+  
+  {/* Hidden range inputs for accessibility and keyboard support */}
+  <input
+    type="range"
+    min={dataMin}
+    max={dataMax}
+    step={(dataMax - dataMin) / 100}
+    value={rangeMin}
+    onChange={(e) => {
+      const value = Number(e.target.value);
+      const adjustedValue = Math.max(dataMin, Math.min(value, rangeMax - (dataMax - dataMin) * 0.01));
+      setRangeMin(Math.floor(adjustedValue));
+    }}
+    className="absolute w-full h-2 bg-transparent appearance-none cursor-pointer opacity-0 z-10"
+  />
+  
+  <input
+    type="range"
+    min={dataMin}
+    max={dataMax}
+    step={(dataMax - dataMin) / 100}
+    value={rangeMax}
+    onChange={(e) => {
+      const value = Number(e.target.value);
+      const adjustedValue = Math.min(dataMax, Math.max(value, rangeMin + (dataMax - dataMin) * 0.01));
+      setRangeMax(Math.floor(adjustedValue));
+    }}
+    className="absolute w-full h-2 bg-transparent appearance-none cursor-pointer opacity-0 z-10"
+  />
+</div>
+              </div>
+            </div>
           </div>
         )}
       </div>
+         
+     
     </div>
-  );
-};
- 
-export default Chat;
-  
+
+    <Separator />
+
+    {/* Totals Display */}
+    {selectedYAxes.length > 0 && (
+      
+      <div className="mt-4 sm:mt-6 flex flex-row items-center justify-between">
+        
+        <div className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-3 gap-3 ">
+          
+          {selectedYAxes.map(field => (
+            <div key={field} className="bg-white dark:bg-slate-950 p-3 rounded-lg border shadow-sm hover:shadow-md transition-shadow">
+              <div className="text-xs font-medium text-muted-foreground mb-1 truncate">
+                {formatFieldName(field)}
+              </div>
+              <div className="text-sm font-bold text-gray-900 dark:text-gray-100 truncate">
+               {formatValue(calculateTotal(field), field)}
+              </div>
+            </div>
+          ))}
+          
+        </div>
+  <TooltipProvider>
+  <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
+    <FormateTooltip>
+      <TooltipTrigger asChild>
+        <Button
+          size="sm"
+          variant={displayFormat === "D" ? "default" : "ghost"}
+          onClick={() => setDisplayFormat("D")}
+          className={`flex-1 text-xs px-2 py-1 ${displayFormat === "D" ? "shadow-sm" : ""}`}
+        >
+          Default
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>Show values in default</p>
+      </TooltipContent>
+    </FormateTooltip>
+    
+    <FormateTooltip>
+      <TooltipTrigger asChild>
+        <Button
+          size="sm"
+          variant={displayFormat === "K" ? "default" : "ghost"}
+          onClick={() => setDisplayFormat("K")}
+          className={`flex-1 text-xs px-2 py-1 ${displayFormat === "K" ? "shadow-sm" : ""}`}
+        >
+          K
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>Show values in thousands</p>
+      </TooltipContent>
+    </FormateTooltip>
+    
+    <FormateTooltip>
+      <TooltipTrigger asChild>
+        <Button
+          size="sm"
+          variant={displayFormat === "M" ? "default" : "ghost"}
+          onClick={() => setDisplayFormat("M")}
+          className={`flex-1 text-xs px-2 py-1 ${displayFormat === "M" ? "shadow-sm" : ""}`}
+        >
+          M
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>Show values in millions</p>
+      </TooltipContent>
+    </FormateTooltip>
+  </div>
+</TooltipProvider>
+      </div>
+    )}
+  </CardHeader>
+
+  <CardContent className="p-2 sm:p-4 pt-0">
+     {chartData.length > 0 && selectedXAxes.length > 0 && selectedYAxes.length > 0 ? (
+          <div id={`chart-container-${ChartNo}`} style={{ width: "100%", height: chartHeight }}>
+            <ResponsiveContainer>{renderChart()}</ResponsiveContainer>
+          </div>
+        ): (
+      <div className="flex flex-col items-center justify-center h-48 sm:h-64 text-muted-foreground">
+        {getChartTypeIcon(chartType)}
+        <div className="mt-4 text-center px-4">
+          <BarChart3 className="h-8 w-8 sm:h-12 sm:w-12 mb-4 mx-auto" />
+          <p className="text-base sm:text-lg mb-2">Configure Your Chart</p>
+          <p className="text-xs sm:text-sm">Select fields from the dropdowns above to display your chart</p>
+        </div>
+      </div>
+    )}
+  </CardContent>
+</Card>
+)
+}

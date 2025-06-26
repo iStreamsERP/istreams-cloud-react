@@ -19,7 +19,7 @@ import jsPDF from 'jspdf';
 import html2canvas from "html2canvas"
 import { callSoapService } from "@/services/callSoapService"
 import { useNavigate } from "react-router-dom"
-export function GrossSalaryChart({ DashBoardID, ChartNo, chartTitle ,chartType: initialChartType = "bar"}) {
+export function GrossSalaryChart({ DashBoardID, ChartNo, chartTitle ,chartType: initialChartType = "bar", chartXAxis, chartYAxis }) {
   const { userData } = useAuth()
   const [tasks, setTasks] = useState([])
   const [displayFormat, setDisplayFormat] = useState("D") // D: Default, K: Thousands, M: Millions
@@ -30,7 +30,7 @@ export function GrossSalaryChart({ DashBoardID, ChartNo, chartTitle ,chartType: 
   
   // Chart type selection - Added pie and donut
   const [chartType, setChartType] = useState(initialChartType) // bar, horizontalBar, line, area, pie, donut
-  
+  const [dbData, setDbData] = useState([])
   // Enhanced chart options
   const [showDataLabels, setShowDataLabels] = useState(true)
   const [dataLabelPosition, setDataLabelPosition] = useState("top") // top, inside, outside, center
@@ -97,7 +97,28 @@ export function GrossSalaryChart({ DashBoardID, ChartNo, chartTitle ,chartType: 
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [DashBoardID, ChartNo])
-
+  useEffect(() => {
+    if (dbData.length > 0 && DashBoardID) {
+      // Find the configuration for current chart
+      const chartConfig = dbData.find(config => 
+        config[`CHART${DashBoardID}_X_AXIS1`] || config[`CHART${DashBoardID}_Y_AXIS1`]
+      )
+      
+      if (chartConfig) {
+        // Set default X-axis field
+        const defaultXField = chartConfig[`CHART${DashBoardID}_X_AXIS1`]
+        if (defaultXField && textFields.includes(defaultXField) && selectedXAxes.length === 0) {
+          setSelectedXAxes([defaultXField])
+        }
+        
+        // Set default Y-axis field  
+        const defaultYField = chartConfig[`CHART${DashBoardID}_Y_AXIS1`]
+        if (defaultYField && numericFields.includes(defaultYField) && selectedYAxes.length === 0) {
+          setSelectedYAxes([defaultYField])
+        }
+      }
+    }
+  }, [dbData, DashBoardID, textFields, numericFields, selectedXAxes.length, selectedYAxes.length])
   useEffect(() => {
   if (initialChartType) {
     setChartType(initialChartType)
@@ -238,45 +259,125 @@ const getEffectiveChartType = () => {
   return chartType
 }
 
-  const fetchChartData = async () => {
-    try {
-      const chartID = { DashBoardID, ChartNo }
-      const res = await callSoapService(userData.clientURL, "BI_GetDashboard_Chart_Data", chartID);
-      console.log("Fetched chart data:", res)
-      setTasks(res)
-
-      // Separate fields by type
-      if (res.length > 0) {
-        const sampleData = res[0]
-        const allFields = Object.keys(sampleData)
-        
-        const textFieldsList = []
-        const numericFieldsList = []
-        
-        allFields.forEach(field => {
-          if (isNumericField(field, sampleData)) {
-            numericFieldsList.push(field)
-          } else {
-            textFieldsList.push(field)
-          }
-        })
-        
-        setTextFields(textFieldsList)
-        setNumericFields(numericFieldsList)
-        
-        // Set defaults
-        if (textFieldsList.length > 0 && selectedXAxes.length === 0) {
-          setSelectedXAxes([textFieldsList[0]])
-        }
-        if (numericFieldsList.length > 0 && selectedYAxes.length === 0) {
-          setSelectedYAxes([numericFieldsList[0]])
-        }
-      }
-    } catch (error) {
-      console.error("Failed to fetch chart data", error)
-    }
+useEffect(() => {
+  // Re-fetch data when X or Y axes selections change
+  if (DashBoardID && ChartNo && (selectedXAxes.length > 0 || selectedYAxes.length > 0)) {
+    fetchChartData()
   }
+}, [selectedXAxes, selectedYAxes])
+const fetchChartData = async () => {
+  try {
+    const chartID = { DashBoardID, ChartNo }
+    const res = await callSoapService(userData.clientURL, "BI_GetDashboard_Chart_Data", chartID);
+    
+    console.log("Fetched chart data:", res)
+    
+    // Separate fields by type
+    if (res.length > 0) {
+      const sampleData = res[0]
+      const allFields = Object.keys(sampleData)
+               
+      const textFieldsList = []
+      const numericFieldsList = []
+               
+      allFields.forEach(field => {
+        if (isNumericField(field, sampleData)) {
+          numericFieldsList.push(field)
+        } else {
+          textFieldsList.push(field)
+        }
+      })
+               
+      setTextFields(textFieldsList)
+      setNumericFields(numericFieldsList)
+      
+      // Set default axes if not already selected
+   if (selectedXAxes.length === 0) {
+  // Extract the part after colon if present
+  const processedChartXAxis = chartXAxis && chartXAxis.includes(':') 
+    ? chartXAxis.split(':')[1].trim() 
+    : chartXAxis;
+    
+  if (processedChartXAxis && textFieldsList.includes(processedChartXAxis)) {
+    setSelectedXAxes([processedChartXAxis])
+  } else if (textFieldsList.length > 0) {
+    setSelectedXAxes([textFieldsList[0]])
+  }
+}
 
+if (selectedYAxes.length === 0) {
+  // Extract the part after colon if present
+  const processedChartYAxis = chartYAxis && chartYAxis.includes(':') 
+    ? chartYAxis.split(':')[1].trim() 
+    : chartYAxis;
+    
+  if (processedChartYAxis && numericFieldsList.includes(processedChartYAxis)) {
+    setSelectedYAxes([processedChartYAxis])
+  } else if (numericFieldsList.length > 0) {
+    setSelectedYAxes([numericFieldsList[0]])
+  }
+}
+      
+      // Call grouping API only if we have both X and Y axes selected
+      if ((selectedXAxes.length > 0 || (chartXAxis && textFieldsList.includes(chartXAxis))) && 
+          (selectedYAxes.length > 0 || (chartYAxis && numericFieldsList.includes(chartYAxis)))) {
+        
+        // Prepare data for grouping API call
+        const inputJSONData = JSON.stringify(res); // Raw JSON data from first API call
+        
+     const processedChartXAxis = chartXAxis && chartXAxis.includes(':') 
+  ? chartXAxis.split(':')[1].trim() 
+  : chartXAxis;
+const processedChartYAxis = chartYAxis && chartYAxis.includes(':') 
+  ? chartYAxis.split(':')[1].trim() 
+  : chartYAxis;
+
+// Use selected X-axes or fallback to default
+const groupColumns = selectedXAxes.length > 0 ? 
+  selectedXAxes.join(",") : 
+  (processedChartXAxis && textFieldsList.includes(processedChartXAxis) ? processedChartXAxis : "");
+
+// Use selected Y-axes or fallback to default
+let yAxisColumns = [];
+if (selectedYAxes.length > 0) {
+  yAxisColumns = selectedYAxes;
+} else if (processedChartYAxis && numericFieldsList.includes(processedChartYAxis)) {
+  yAxisColumns = [processedChartYAxis];
+} else if (numericFieldsList.length > 0) {
+  yAxisColumns = [numericFieldsList[0]];
+}
+        
+        const summaryColumns = yAxisColumns.map(col => `SUM:${col}`).join(",");
+        
+        const jsonDataID = {
+          inputJSONData: inputJSONData,
+          FilterCondition: "",
+          groupColumns: groupColumns,
+          summaryColumns: summaryColumns
+        }
+        
+        console.log("Grouped json:", inputJSONData);
+        console.log("Grouped col:", groupColumns);
+        console.log("Grouped sum:", summaryColumns);
+
+        // Call the grouping API with processed data
+        const groupedData = await callSoapService(userData.clientURL, "Data_Group_JSONValues", jsonDataID);
+        console.log("Grouped chart data:", groupedData);
+        
+        // Use the grouped data for the chart
+        setTasks(groupedData)
+      } else {
+        // If no axes selected, use original data
+        setTasks(res)
+      }
+    } else {
+      // If no data from first API call, set empty tasks
+      setTasks([])
+    }
+  } catch (error) {
+    console.error("Failed to fetch chart data", error)
+  }
+}
   const handleXAxisChange = (field, checked) => {
     if (checked) {
       setSelectedXAxes([...selectedXAxes, field])
@@ -576,27 +677,40 @@ const removeCustomColor = (index) => {
     return positions[dataLabelPosition] || "top"
   }
 
-  const handleBarClick = (data, index, event) => {
+
+const handleBarClick = (data, index, event) => {
   if (!data || !data.payload) return
   
   const clickedData = data.payload
   const selectedCategory = clickedData.combinedKey || clickedData.name
   
-  // Get the primary Y-axis field (first selected field)
-  const primaryField = selectedYAxes[0]
-  if (!primaryField) return
+  console.log("Bar clicked - Category:", selectedCategory)
+  console.log("Clicked data:", clickedData)
+  console.log("X-Axis fields:", selectedXAxes)
+  console.log("Y-Axis fields:", selectedYAxes)
   
-  const fieldValue = clickedData[primaryField]
-  
-  // Navigate to chart details page with drill-down data
+  // Navigate to chart details page with comprehensive drill-down data
   navigate('/Chartdetails', {
     state: {
-      selectedCategory,
-      fieldName: primaryField,
-      fieldValue,
       dashboardId: DashBoardID,
       chartNo: ChartNo,
-      chartTitle: customTitle
+      chartTitle: customTitle,
+      selectedCategory: selectedCategory, // The clicked category value (e.g., "Sales | North" for multiple fields)
+      xAxisFields: selectedXAxes, // Array of X-axis fields for filter construction
+      yAxisFields: selectedYAxes, // Array of Y-axis fields for reference
+      // Additional context for filtering and display
+      filterContext: {
+        rangeMin: rangeMin,
+        rangeMax: rangeMax,
+        selectedRangeField: selectedRangeField,
+        selectedCategories: selectedCategories,
+        displayFormat: displayFormat,
+        currencySymbol: currencySymbol,
+        companyCurrDecimals: userData?.companyCurrDecimals || 0,
+        companyCurrIsIndianStandard: userData?.companyCurrIsIndianStandard
+      },
+      // Raw clicked data for additional context
+      clickedBarData: clickedData
     }
   })
 }
@@ -2451,10 +2565,10 @@ return (
   />
 </div>
 
-                </div>
+</div>
                 
                 {/* Compact Range Slider */}
-                <div className="relative w-full h-6 flex items-center" ref={sliderRef}>
+<div className="relative w-full h-6 flex items-center" ref={sliderRef}>
   <div className="absolute w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg shadow-inner"></div>
   <div
     className="absolute h-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg shadow-md"

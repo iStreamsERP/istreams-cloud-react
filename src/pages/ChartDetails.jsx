@@ -8,6 +8,8 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
 import { ArrowLeft, Download, Search, Filter, TableIcon, BarChart3, Printer,ChevronDown, X } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
+import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
 import { callSoapService } from "@/services/callSoapService"
 import {
   Breadcrumb,
@@ -35,6 +37,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import * as XLSX from 'xlsx'
@@ -63,7 +73,8 @@ export default function ChartDetails() {
     filterContext
   } = location.state || {}
 
-
+const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
+const badgeTitle = chartTitle || 'Chart Details'
 
   const currencySymbol = userData?.companyCurrSymbol || "$"
 
@@ -736,95 +747,440 @@ const getActiveFilterCount = () => {
   });
   return count;
 };
+const getColumnTypes = () => {
+  const types = {}
+  if (filteredData.length > 0) {
+    const sampleData = filteredData[0]
+    Object.keys(sampleData).forEach(key => {
+      types[key] = isNumericField(key, sampleData) ? 'numeric' : 'text'
+    })
+  }
+  return types
+}
 
-const handlePrint = () => {
-  const printWindow = window.open('', '_blank');
+
+const formatHeader = (header) => {
+  return header
+    .replace(/[_-]/g, " ")
+    .toLowerCase()
+    .replace(/^\w/, (c) => c.toUpperCase())
+}
+const formatDate = (value) => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (isNaN(date.getTime())) return value
+  return date.toLocaleDateString()
+}
+const columnTypes = getColumnTypes()
+const calculateColumnWidths = (data) => {
+  if (!data || data.length === 0) return {}
   
-  const stylesheets = Array.from(document.styleSheets);
-  let styleText = '';
+  const columnWidths = {}
+  const headers = Object.keys(data[0])
   
-  stylesheets.forEach(stylesheet => {
-    try {
-      const rules = stylesheet.cssRules || stylesheet.rules;
-      for (let i = 0; i < rules.length; i++) {
-        styleText += rules[i].cssText + '\n';
-      }
-    } catch (e) {
-      console.warn('Could not load stylesheet:', e);
-    }
-  });
+  headers.forEach(header => {
+    // Start with header width
+    let maxWidth = formatHeader(header).length * 8 + 20 // 8px per char + padding
+    
+    // Check content width for first 10 rows (for performance)
+    const sampleRows = data.slice(0, Math.min(10, data.length))
+    sampleRows.forEach(row => {
+      const cellValue = header.toLowerCase().includes("date") 
+        ? formatDate(row[header]) 
+        : formatValue(row[header], header)
+      const contentWidth = String(cellValue).length * 7 + 20 // 7px per char + padding
+      maxWidth = Math.max(maxWidth, contentWidth)
+    })
+    
+    // Set reasonable min/max limits
+    columnWidths[header] = Math.min(Math.max(maxWidth, 60), 200) // min 60px, max 200px
+  })
   
-  let allDataTableHTML = `
-    <table class="w-full border-collapse">
-      <thead class="bg-muted/50">
-        <tr>
-          ${
-            filteredData[0] && 
-            Object.keys(filteredData[0])
-              .map(key => `<th class="p-2 text-left font-medium border">${formatFieldName(key)}</th>`)
-              .join('')
-          }
-        </tr>
-      </thead>
-      <tbody>
-        ${
-          filteredData.map(item => `
-            <tr class="hover:bg-muted/50">
-              ${
-                Object.keys(item)
-                  .map(key => `
-                    <td class="p-2 border">
-                      ${formatValue(item[key], key)}
-                    </td>
-                  `)
-                  .join('')
-              }
-            </tr>
-          `).join('')
-        }
-      </tbody>
-    </table>
-  `;
-  
-  const printContent = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>${chartTitle || 'Chart Details'}</title>
-      <style>
-        ${styleText}
-        @media print {
-          body { padding: 20px; }
-          table { width: 100%; border-collapse: collapse; }
-          th, td { padding: 8px; border: 1px solid #ddd; }
-          th { background-color: #f2f2f2; }
-        }
-      </style>
-    </head>
-    <body>
-      <h1>${chartTitle || 'Chart Details'}</h1>
-      <p>Total Records: ${filteredData.length}</p>
-      ${allDataTableHTML}
-    </body>
-    </html>
-  `;
-  
-  printWindow.document.open();
-  printWindow.document.write(printContent);
-  printWindow.document.close();
-  
-  printWindow.onload = function() {
-    printWindow.print();
-    setTimeout(() => {
-      try {
-        printWindow.close();
-      } catch (e) {
-        console.warn('Could not close print window:', e);
-      }
-    }, 500);
-  };
+  return columnWidths
+}
+const exportToPDF = async () => {
+  try {
+    setIsGeneratingPDF(true);
+    
+    // Get user data from auth context
+    const currentUserImageData = userData?.userAvatar
+      ? (userData.userAvatar.startsWith('data:') ? userData.userAvatar : `data:image/jpeg;base64,${userData.userAvatar}`)
+      : null;
+    const currentUserName = userData?.userName || '';
+    const companyLogoData = userData?.companyLogo
+      ? (userData.companyLogo.startsWith('data:') ? userData.companyLogo : `data:image/jpeg;base64,${userData.companyLogo}`)
+      : null;
+
+    // Calculate optimal column widths
+    const columnWidths = calculateColumnWidths(filteredData);
+    const totalTableWidth = Object.values(columnWidths).reduce((sum, width) => sum + width, 0);
+    
+    // Adjust container width based on table content
+    const containerWidth = Math.max(800, totalTableWidth + 60); // minimum 800px
+    
+    // Pagination settings - adjust based on content
+    const ROWS_PER_PAGE = 40; // Slightly reduced for better spacing
+    const totalPages = Math.ceil(filteredData.length / ROWS_PER_PAGE);
+    
+    // Create PDF with landscape orientation for wider tables
+    const pdf = new jsPDF({
+      orientation: totalTableWidth > 600 ? 'landscape' : 'portrait',
+      unit: 'mm',
+      format: 'a4',
+      compress: true
+    });
+
+    // A4 dimensions in mm
+    const pdfWidth = totalTableWidth > 600 ? 297 : 210;
+    const pdfHeight = totalTableWidth > 600 ? 210 : 297;
+
+    // Function to create header content
+ 
+const createHeaderContent = () => {
+  const headerContainer = document.createElement('div');
+  headerContainer.style.width = `${containerWidth}px`;
+  headerContainer.style.padding = '15px';
+  headerContainer.style.paddingBottom = '12px';
+  headerContainer.style.backgroundColor = 'white';
+  headerContainer.style.boxSizing = 'border-box';
+  headerContainer.style.color = '#000000';
+  headerContainer.style.fontFamily = 'Arial, sans-serif';
+
+  const header = document.createElement('div');
+  header.style.display = 'flex';
+  header.style.flexDirection = 'column';
+  header.style.alignItems = 'center';
+  header.style.borderBottom = '1px solid #e0e0e0';
+  header.style.paddingBottom = '12px';
+
+  // Top row - Company logo (left) and company details (right)
+  const topRow = document.createElement('div');
+  topRow.style.display = 'flex';
+  topRow.style.justifyContent = 'space-between';
+  topRow.style.alignItems = 'flex-start';
+  topRow.style.width = '100%';
+  topRow.style.marginBottom = '10px';
+
+  // Left column - Company logo only
+  const leftColumn = document.createElement('div');
+  leftColumn.style.flex = '0 0 auto';
+  leftColumn.style.display = 'flex';
+  leftColumn.style.alignItems = 'flex-start';
+
+  if (companyLogoData) {
+    const companyLogo = document.createElement('img');
+    companyLogo.src = companyLogoData;
+    companyLogo.style.width = '120px';
+    companyLogo.style.height = '40px';
+    companyLogo.style.objectFit = 'cover';
+    leftColumn.appendChild(companyLogo);
+  }
+
+  topRow.appendChild(leftColumn);
+
+  // Right column - Company details
+  const rightColumn = document.createElement('div');
+  rightColumn.style.flex = '0 0 auto';
+  rightColumn.style.textAlign = 'right';
+  rightColumn.style.display = 'flex';
+  rightColumn.style.flexDirection = 'column';
+  rightColumn.style.alignItems = 'flex-end';
+
+  const companyTitle = document.createElement('h3');
+  companyTitle.textContent = userData?.companyName || 'Company Name';
+  companyTitle.style.fontSize = '14px';
+  companyTitle.style.fontWeight = 'bold';
+  companyTitle.style.marginBottom = '3px';
+  companyTitle.style.color = '#1e40af';
+  companyTitle.style.margin = '0 0 3px 0';
+
+  const companyAddress = document.createElement('div');
+  companyAddress.innerHTML = `Address: ${userData?.companyAddress || 'N/A'}`;
+  companyAddress.style.fontSize = '9px';
+  companyAddress.style.lineHeight = '1.2';
+  companyAddress.style.marginBottom = '3px';
+
+  rightColumn.appendChild(companyTitle);
+  rightColumn.appendChild(companyAddress);
+  topRow.appendChild(rightColumn);
+  header.appendChild(topRow);
+
+  // Middle row - PDF title (centered)
+  const titleRow = document.createElement('div');
+  titleRow.style.textAlign = 'center';
+  titleRow.style.width = '100%';
+  titleRow.style.marginBottom = selectedCategory ? '8px' : '0';
+
+  const pdfTitle = document.createElement('h3');
+  pdfTitle.textContent = badgeTitle;
+  pdfTitle.style.fontSize = '16px';
+  pdfTitle.style.fontWeight = 'bold';
+  pdfTitle.style.margin = '0';
+  pdfTitle.style.color = 'black';
+
+  titleRow.appendChild(pdfTitle);
+  header.appendChild(titleRow);
+
+  // Bottom row - Filter information (if selectedCategory exists)
+  if (selectedCategory) {
+    const filterRow = document.createElement('div');
+    filterRow.style.textAlign = 'center';
+    filterRow.style.width = '100%';
+
+    const filterInfo = document.createElement('p');
+    filterInfo.textContent = `- Filtered by: ${selectedCategory}`;
+    filterInfo.style.fontSize = '12px';
+    filterInfo.style.margin = '0';
+    filterInfo.style.color = '#666666';
+    filterInfo.style.fontStyle = 'italic';
+
+    filterRow.appendChild(filterInfo);
+    header.appendChild(filterRow);
+  }
+
+  headerContainer.appendChild(header);
+  return headerContainer;
 };
 
+    // Function to create table for a specific page
+    const createTableForPage = (pageData, pageNumber) => {
+      const tableContainer = document.createElement('div');
+      tableContainer.style.width = `${containerWidth}px`;
+      tableContainer.style.padding = '15px';
+      tableContainer.style.paddingTop = '8px';
+      tableContainer.style.backgroundColor = 'white';
+      tableContainer.style.boxSizing = 'border-box';
+      tableContainer.style.color = '#000000';
+      tableContainer.style.fontFamily = 'Arial, sans-serif';
+
+      const table = document.createElement('table');
+      table.style.width = '100%';
+      table.style.borderCollapse = 'collapse';
+      table.style.fontFamily = 'Arial, sans-serif';
+      table.style.fontSize = '11px';
+      table.style.marginTop = '8px';
+      table.style.color = '#000000';
+      table.style.textRendering = 'optimizeLegibility';
+      table.style.webkitFontSmoothing = 'antialiased';
+      table.style.tableLayout = 'fixed'; // Enable fixed layout for consistent widths
+
+      // Table header
+      const thead = document.createElement('thead');
+      const headerRow = document.createElement('tr');
+      headerRow.style.backgroundColor = '#f0f0f0';
+      headerRow.style.border = '1px solid #d0d0d0';
+
+      if (filteredData[0]) {
+        Object.keys(filteredData[0]).forEach(key => {
+          const th = document.createElement('th');
+          th.textContent = formatHeader(key);
+          th.style.padding = '8px 6px';
+          th.style.textAlign = columnTypes[key] === 'numeric' ? 'right' : 'left';
+          th.style.border = '1px solid #d0d0d0';
+          th.style.fontWeight = 'bold';
+          th.style.fontSize = '12px';
+          th.style.width = `${columnWidths[key]}px`;
+          th.style.minWidth = `${columnWidths[key]}px`;
+          th.style.wordWrap = 'break-word';
+          th.style.whiteSpace = 'normal'; // Allow text wrapping
+          headerRow.appendChild(th);
+        });
+      }
+
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      // Table body for current page
+      const tbody = document.createElement('tbody');
+      pageData.forEach((row, index) => {
+        const tr = document.createElement('tr');
+        tr.style.border = '1px solid #d0d0d0';
+        tr.style.backgroundColor = index % 2 === 0 ? '#ffffff' : '#f8f8f8';
+
+        Object.keys(row).forEach(key => {
+          const td = document.createElement('td');
+          const cellValue = key.toLowerCase().includes("date") ? formatDate(row[key]) : formatValue(row[key], key);
+          td.textContent = cellValue;
+          td.style.padding = '6px 4px';
+          td.style.textAlign = columnTypes[key] === 'numeric' ? 'right' : 'left';
+          td.style.border = '1px solid #d0d0d0';
+          td.style.fontSize = '10px';
+          td.style.width = `${columnWidths[key]}px`;
+          td.style.minWidth = `${columnWidths[key]}px`;
+          td.style.wordWrap = 'break-word';
+          td.style.whiteSpace = 'normal'; // Allow text wrapping
+          td.style.lineHeight = '1.3'; // Better line spacing
+          td.style.verticalAlign = 'top'; // Align content to top
+          tr.appendChild(td);
+        });
+
+        tbody.appendChild(tr);
+      });
+
+      table.appendChild(tbody);
+      tableContainer.appendChild(table);
+
+      return tableContainer;
+    };
+
+    // Function to create footer
+    const createFooter = (pageNumber, totalPages) => {
+      const footerContainer = document.createElement('div');
+      footerContainer.style.width = `${containerWidth}px`;
+      footerContainer.style.padding = '15px';
+      footerContainer.style.paddingTop = '8px';
+      footerContainer.style.backgroundColor = 'white';
+      footerContainer.style.boxSizing = 'border-box';
+      footerContainer.style.color = '#000000';
+      footerContainer.style.fontFamily = 'Arial, sans-serif';
+
+      const currentDate = new Date();
+      const formattedDateTime = currentDate.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
+
+      const footer = document.createElement('div');
+      footer.style.display = 'flex';
+      footer.style.justifyContent = 'space-between';
+      footer.style.alignItems = 'center';
+      footer.style.marginTop = '15px';
+      footer.style.paddingTop = '8px';
+      footer.style.borderTop = '1px solid #e0e0e0';
+      footer.style.fontSize = '10px';
+      footer.style.color = '#666';
+
+      const dateTimeFooter = document.createElement('div');
+      dateTimeFooter.textContent = `Generated on: ${formattedDateTime}`;
+      
+      const pageInfo = document.createElement('div');
+      pageInfo.textContent = `Page ${pageNumber} of ${totalPages}`;
+      pageInfo.style.textAlign = 'center';
+      pageInfo.style.flex = '1';
+
+      const recordRange = document.createElement('div');
+      const startRecord = (pageNumber - 1) * ROWS_PER_PAGE + 1;
+      const endRecord = Math.min(pageNumber * ROWS_PER_PAGE, filteredData.length);
+      recordRange.textContent = `Records ${startRecord}-${endRecord}`;
+
+      footer.appendChild(dateTimeFooter);
+      footer.appendChild(pageInfo);
+      footer.appendChild(recordRange);
+      footerContainer.appendChild(footer);
+
+      return footerContainer;
+    };
+
+    // Generate each page
+    for (let pageNumber = 1; pageNumber <= totalPages; pageNumber++) {
+      const startIndex = (pageNumber - 1) * ROWS_PER_PAGE;
+      const endIndex = startIndex + ROWS_PER_PAGE;
+      const pageData = filteredData.slice(startIndex, endIndex);
+
+      // Create temporary container for this page
+      const tempContainer = document.createElement('div');
+      tempContainer.style.position = 'fixed';
+      tempContainer.style.left = '-9999px';
+      tempContainer.style.top = '0';
+
+      // Add header
+      const headerContent = createHeaderContent();
+      tempContainer.appendChild(headerContent);
+
+      // Add table for this page
+      const tableContent = createTableForPage(pageData, pageNumber);
+      tempContainer.appendChild(tableContent);
+
+      // Add footer
+      const footerContent = createFooter(pageNumber, totalPages);
+      tempContainer.appendChild(footerContent);
+
+      // Add to document temporarily
+      document.body.appendChild(tempContainer);
+
+      // Generate canvas for this page with higher quality
+      const canvas = await html2canvas(tempContainer, {
+        scale: 2.5, // Increased scale for better text quality
+        logging: false,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        width: containerWidth,
+        onclone: (clonedDoc) => {
+          const style = clonedDoc.createElement('style');
+          style.textContent = `
+            * {
+              text-rendering: optimizeLegibility !important;
+              -webkit-font-smoothing: antialiased !important;
+              -moz-osx-font-smoothing: grayscale !important;
+            }
+          `;
+          clonedDoc.head.appendChild(style);
+        }
+      });
+
+      // Add new page if not the first page
+      if (pageNumber > 1) {
+        pdf.addPage();
+      }
+
+      // Add image to PDF
+      const imgData = canvas.toDataURL('image/png');
+      
+      const marginTop = 8;
+      const marginSide = 8;
+      const marginBottom = 8;
+      
+      const maxWidth = pdfWidth - (marginSide * 2);
+      const maxHeight = pdfHeight - marginTop - marginBottom;
+      
+      const canvasAspectRatio = canvas.width / canvas.height;
+      const pageAspectRatio = maxWidth / maxHeight;
+      
+      let finalWidth, finalHeight;
+      
+      if (canvasAspectRatio > pageAspectRatio) {
+        finalWidth = maxWidth;
+        finalHeight = maxWidth / canvasAspectRatio;
+      } else {
+        finalHeight = maxHeight;
+        finalWidth = maxHeight * canvasAspectRatio;
+      }
+      
+      const centerX = (pdfWidth - finalWidth) / 2;
+      const startY = marginTop;
+
+      pdf.addImage(
+        imgData,
+        'PNG',
+        centerX,
+        startY,
+        finalWidth,
+        finalHeight,
+        undefined,
+        'SLOW'
+      );
+
+      // Clean up temporary container
+      document.body.removeChild(tempContainer);
+    }
+
+    // Save PDF
+    setTimeout(() => {
+      pdf.save(`${badgeTitle.replace(/\s+/g, '_')}`);
+      setIsGeneratingPDF(false);
+    }, 500);
+
+  } catch (error) {
+    console.error('Error exporting to PDF:', error);
+    setIsGeneratingPDF(false);
+  }
+};
 const handleDownloadExcel = () => {
   const formattedData = filteredData.map(item => {
     const formattedItem = {};
@@ -892,11 +1248,12 @@ const handleDownloadExcel = () => {
       {/* Header */}
       <div className="space-y-1 flex justify-between items-center">
         <h1 className="text-2xl font-bold tracking-tight">   
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-1 md-flex md:flex-row md:items-center ">
+            <div className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5" />
-            {chartTitle || 'Chart Details'} - {selectedCategory && (
+            {chartTitle || 'Chart Details'}</div>  {selectedCategory && (
                [ <p className="text-sm text-muted-foreground mt-1">
-                  Filtered by: {selectedCategory}
+                 - Filtered by: {selectedCategory}
                 </p>]
               )}
           </div>
@@ -907,154 +1264,161 @@ const handleDownloadExcel = () => {
               <Button
                 variant="outline"
                 onClick={() => navigate(-1)}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2  "
               >
                 <ArrowLeft className="h-4 w-4" />
-                Back to Dashboard
+               <span className="hidden sm:inline">Back to Dashboard</span>  
+               <span className="sm:hidden">Back</span>
               </Button>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
       </div>
 
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="flex flex-row justify-between gap-3 w-full">
-          <div className="flex gap-2">
-            <div className=" w-full sm:w-64  flex middle center gap-2">
-               <Button 
-              variant="outline" 
-              className="gap-2"
-              onClick={clearAllFilters}
-            >
-              <Filter className="h-4 w-4" />
-              <span>Clear Filters</span>
-              {getActiveFilterCount() > 0 && (
-                <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-primary text-primary-foreground text-xs">
-                  {getActiveFilterCount()}
-                </span>
-              )}
-            </Button>
-              <div className="relative w-full sm:w-64 flex  middle center gap-2">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search "
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value)
-                  setCurrentPage(1)
-                }}
-                type="search"
-                className="pl-8 w-full pt-"
-              />
-              </div>
-             
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-
-  <Button
-    variant="outline"
-    onClick={handlePrint}
-    disabled={filteredData.length === 0}
-    className="flex items-center gap-2"
-  >
-    <Printer className="h-4 w-4" />
-    Print
-  </Button>
-  <Button
-    variant="outline"
-    onClick={handleDownloadExcel}
-    disabled={filteredData.length === 0}
-    className="flex items-center gap-2"
-  >
-    <Download className="h-4 w-4" />
-    Export Excel
-  </Button>
-  
-          </div>
+<div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+  <div className="flex flex-row justify-between gap-3 w-full">
+    <div className="flex gap-2 w-full"> {/* Changed: Added w-full here */}
+      <div className="flex gap-2 w-full"> {/* Changed: Removed width constraints, added w-full */}
+        <Button 
+          variant="outline" 
+          className="gap-2 flex-shrink-0" // Added flex-shrink-0 to prevent button from shrinking
+          onClick={clearAllFilters}
+        >
+          <Filter className="h-4 w-4" />
+          <span>Clear Filters</span>
+          {getActiveFilterCount() > 0 && (
+            <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-primary text-primary-foreground text-xs">
+              {getActiveFilterCount()}
+            </span>
+          )}
+        </Button>
+        <div className="relative flex-1"> {/* Changed: Removed width constraints, added flex-1 for full remaining width */}
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search"
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value)
+              setCurrentPage(1)
+            }}
+            type="search"
+            className="pl-8 w-full" // w-full is already there, but keeping it for clarity
+          />
         </div>
       </div>
+    </div>
+
+    <div className="flex gap-2 flex-shrink-0"> {/* Added flex-shrink-0 to prevent download button from shrinking */}
+      {/* Updated Download Dropdown Button */}
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            disabled={filteredData.length === 0}
+            className="flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+           <span className="sr-only sm:not-sr-only">Download</span>
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-48 p-2" align="end">
+          <div className="space-y-1">
+            <Button
+              variant="ghost"
+              onClick={exportToPDF}
+              disabled={filteredData.length === 0 || isGeneratingPDF}
+              className="w-full justify-start gap-2"
+            >
+              <Printer className="h-4 w-4" />
+              {isGeneratingPDF ? 'Generating...' : 'Print PDF'}
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={handleDownloadExcel}
+              disabled={filteredData.length === 0}
+              className="w-full justify-start gap-2"
+            >
+              <Download className="h-4 w-4" />
+              Export Excel
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  </div>
+</div>
 
       {/* Data Table */}
       <Card>
         <CardContent className="p-0">
           {paginatedData.length > 0 ? (
             <>
-              <ScrollArea className="w-full">
-                <div className="min-w-full">
-                  <table className="w-full">
-                    <thead className="bg-muted/50 sticky top-0 z-10">
-                    <tr>
-                      {allFields.map((field, index) => (
-                        <th
-                          key={field}
-                          className="px-4 py-3 text-left text-sm font-medium text-muted-foreground border-b"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              {formatFieldName(field)}
-                              {/* {isNumericField(field, sampleData) && (
-                                <Badge variant="secondary" className="text-xs">
-                                  
-                                </Badge>
-                              )} */}
-                            </div>
-                            <ExcelFilter column={field} />
-                          </div>
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                   <tbody>
-  {paginatedData.map((row, rowIndex) => (
-    <tr
-      key={rowIndex}
-      className="border-b hover:bg-muted/25 transition-colors"
-    >
-      {allFields.map((field) => (
-       <td
-  key={`${rowIndex}-${field}`}
-  className={`px-4 py-3 text-sm ${isNumericField(field, sampleData) ? 'text-right' : ''}`}
->
-          <div className="max-w-xs truncate" title={String(row[field] || '')}>
-            {isNumericField(field, sampleData) ? (
-              <span className="font-mono">
-                {formatValue(row[field], field)}
-              </span>
-            ) : (
-              <span>{String(row[field] || '')}</span>
-            )}
-          </div>
-        </td>
-      ))}
-    </tr>
-  ))}
-  
-  {/* ADD THIS TOTALS ROW */}
-  <tr className="border-t-2 border-primary/20 bg-muted/30 font-semibold">
-    {allFields.map((field, index) => (
-     
-<td
-  key={`total-${field}`}
-  className={`px-4 py-3 text-sm ${isNumericField(field, sampleData) ? 'text-right' : ''}`}
->
-        {index === 0 ? (
-          <span className="font-bold">Total:</span>
-        ) : isNumericField(field, sampleData) ? (
-          <span className="font-mono font-bold">
-            {formatValue(columnTotals[field], field)}
-          </span>
-        ) : (
-          <span className="text-muted-foreground">-</span>
-        )}
-      </td>
-    ))}
-  </tr>
-</tbody>
-                  </table>
-                </div>
-              </ScrollArea>
+       <div className="overflow-x-auto">
+          <Table className="w-full min-w-max"> {/* Changed: removed table-fixed, added min-w-max */}
+            <TableHeader className="bg-muted/50 sticky top-0 z-10">
+              <TableRow>
+                {allFields.map((field, index) => (
+                  <TableHead
+                    key={field}
+                    className="px-4 py-3 text-left text-sm font-medium text-muted-foreground border-b whitespace-nowrap" // Added: whitespace-nowrap
+                  >
+                    <div className="flex items-center justify-between gap-2 min-w-0"> {/* Added: min-w-0 */}
+                      <div className="flex items-center gap-2">
+                        {formatFieldName(field)}
+                      </div>
+                      <ExcelFilter column={field} />
+                    </div>
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paginatedData.map((row, rowIndex) => (
+                <TableRow
+                  key={rowIndex}
+                  className="border-b hover:bg-muted/25 transition-colors"
+                >
+                  {allFields.map((field) => (
+                    <TableCell
+                      key={`${rowIndex}-${field}`}
+                      className={`px-4 py-3 text-sm whitespace-nowrap ${isNumericField(field, sampleData) ? 'text-right' : ''}`} // Added: whitespace-nowrap
+                    >
+                      {/* Removed the truncate wrapper div */}
+                      {isNumericField(field, sampleData) ? (
+                        <span className="font-mono">
+                          {formatValue(row[field], field)}
+                        </span>
+                      ) : (
+                        <span>{String(row[field] || '')}</span>
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+              
+              {/* Totals Row */}
+              <TableRow className="border-t-2 border-primary/20 bg-muted/30 font-semibold">
+                {allFields.map((field, index) => (
+                  <TableCell
+                    key={`total-${field}`}
+                    className={`px-4 py-3 text-sm whitespace-nowrap ${isNumericField(field, sampleData) ? 'text-right' : ''}`} // Added: whitespace-nowrap
+                  >
+                    {index === 0 ? (
+                      <span className="font-bold">Total:</span>
+                    ) : isNumericField(field, sampleData) ? (
+                      <span className="font-mono font-bold">
+                        {formatValue(columnTotals[field], field)}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                ))}
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
+             
 
               {/* Pagination */}
    

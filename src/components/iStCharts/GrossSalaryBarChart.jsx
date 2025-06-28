@@ -82,11 +82,7 @@ export function GrossSalaryChart({ DashBoardID, ChartNo, chartTitle ,chartType: 
   const isNumericField = (fieldName, sampleData) => {
     const value = sampleData[fieldName]
     if (value === null || value === undefined || value === '') return false
-    
-    // Check if it's already a number
     if (typeof value === 'number') return true
-    
-    // Check if it can be converted to a valid number
     const numValue = Number(value)
     return !isNaN(numValue) && isFinite(numValue)
   }
@@ -95,7 +91,6 @@ export function GrossSalaryChart({ DashBoardID, ChartNo, chartTitle ,chartType: 
     if (DashBoardID && ChartNo) {
       fetchChartData()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [DashBoardID, ChartNo])
   useEffect(() => {
     if (dbData.length > 0 && DashBoardID) {
@@ -471,7 +466,7 @@ const processChartData = () => {
     if (selectedRangeField && selectedYAxes.includes(selectedRangeField)) {
       const fieldValue = parseFloat(task[selectedRangeField]) || 0
       if (fieldValue < rangeMin || fieldValue > rangeMax) {
-        return // Skip this record
+        return 
       }
     }
 

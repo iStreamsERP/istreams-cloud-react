@@ -3,8 +3,10 @@ import { getDashBoardBadgeDetails } from "@/services/iStDashBoardServices";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useParams, useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
-
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 import { Button } from "@/components/ui/button";
+
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -61,6 +63,7 @@ const DbBadgeTable = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [columnFilters, setColumnFilters] = useState({});
   const [columnValues, setColumnValues] = useState({});
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const tableRef = useRef();
 
   const badgeTitle = location.state?.badgeTitle || "Dashboard Details";
@@ -220,102 +223,6 @@ const DbBadgeTable = () => {
       .join(" ");
   };
 
-  const handlePrint = () => {
-    // Create a new window
-    const printWindow = window.open('', '_blank');
-    
-    // Get all stylesheets from the current document
-    const stylesheets = Array.from(document.styleSheets);
-    let styleText = '';
-    
-    // Extract and combine all CSS rules
-    stylesheets.forEach(stylesheet => {
-      try {
-        const rules = stylesheet.cssRules || stylesheet.rules;
-        for (let i = 0; i < rules.length; i++) {
-          styleText += rules[i].cssText + '\n';
-        }
-      } catch (e) {
-        // Skip external stylesheets that may cause CORS issues
-        console.warn('Could not load stylesheet:', e);
-      }
-    });
-    
-    // Create a temporary table with all data
-    let allDataTableHTML = `
-      <table class="w-full border-collapse">
-        <thead class="bg-muted/50">
-          <tr>
-            ${
-              filteredData[0] && 
-              Object.keys(filteredData[0])
-                .map(key => `<th class="p-2 text-left font-medium border">${formatHeader(key)}</th>`)
-                .join('')
-            }
-          </tr>
-        </thead>
-        <tbody>
-          ${
-            filteredData.map(item => `
-              <tr class="hover:bg-muted/50">
-                ${
-                  Object.keys(item)
-                    .map(key => `
-                      <td class="p-2 border">
-                        ${key.toLowerCase().includes("date") ? formatDate(item[key]) : item[key]}
-                      </td>
-                    `)
-                    .join('')
-                }
-              </tr>
-            `).join('')
-          }
-        </tbody>
-      </table>
-    `;
-    
-    // Create a proper HTML document with styles
-    const printContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>${badgeTitle}</title>
-        <style>
-          ${styleText}
-          @media print {
-            body { padding: 20px; }
-            table { width: 100%; border-collapse: collapse; }
-            th, td { padding: 8px; border: 1px solid #ddd; }
-            th { background-color: #f2f2f2; }
-          }
-        </style>
-      </head>
-      <body>
-        <h1>${badgeTitle}</h1>
-        <p>Total Records: ${filteredData.length}</p>
-        ${allDataTableHTML}
-      </body>
-      </html>
-    `;
-    
-    // Write to the new window
-    printWindow.document.open();
-    printWindow.document.write(printContent);
-    printWindow.document.close();
-    
-    // Wait for content to load before printing
-    printWindow.onload = function() {
-      printWindow.print();
-      // Close the window after printing (or after a delay if printing was canceled)
-      setTimeout(() => {
-        try {
-          printWindow.close();
-        } catch (e) {
-          console.warn('Could not close print window:', e);
-        }
-      }, 500);
-    };
-  }
 
   const handleDownloadExcel = () => {
     // Create a copy of the filtered data with formatted dates
@@ -335,7 +242,371 @@ const DbBadgeTable = () => {
     XLSX.writeFile(wb, `${badgeTitle.replace(/[^a-z0-9]/gi, "_")}.xlsx`);
   };
 
-  // Excel-like filter functions
+
+const exportToPDF = async () => {
+  try {
+    setIsGeneratingPDF(true);
+    const tableElement = tableRef.current;
+    if (!tableElement) {
+      console.error('Table element not found');
+      setIsGeneratingPDF(false);
+      return;
+    }
+
+    // Get user data from auth context
+    const currentUserImageData = userData?.userAvatar
+      ? (userData.userAvatar.startsWith('data:') ? userData.userAvatar : `data:image/jpeg;base64,${userData.userAvatar}`)
+      : null;
+    const currentUserName = userData?.userName || '';
+    const companyLogoData = userData?.companyLogo
+      ? (userData.companyLogo.startsWith('data:') ? userData.companyLogo : `data:image/jpeg;base64,${userData.companyLogo}`)
+      : null;
+
+    // Pagination settings - 20-30 lines as requested
+    const ROWS_PER_PAGE = 45; 
+    const totalPages = Math.ceil(filteredData.length / ROWS_PER_PAGE);
+    
+    // Create PDF with proper A4 dimensions
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4', // Ensures true A4 size (210 x 297 mm portrait)
+      compress: true
+    });
+
+    // A4 portrait dimensions in mm
+    const pdfWidth = 210; // A4 portrait width
+    const pdfHeight = 297; // A4 portrait height
+
+    // Function to create header content - optimized for A4 portrait
+ // Function to create header content - optimized for A4 portrait
+const createHeaderContent = () => {
+  const headerContainer = document.createElement('div');
+  headerContainer.style.width = '750px'; // Adjusted for A4 portrait proportions
+  headerContainer.style.padding = '15px';
+  headerContainer.style.paddingBottom = '12px';
+  headerContainer.style.backgroundColor = 'white';
+  headerContainer.style.boxSizing = 'border-box';
+  headerContainer.style.color = '#000000';
+  headerContainer.style.fontFamily = 'Arial, sans-serif';
+
+  const header = document.createElement('div');
+  header.style.display = 'flex';
+  header.style.flexDirection = 'column'; // Stack vertically for portrait
+  header.style.alignItems = 'center';
+  header.style.borderBottom = '1px solid #e0e0e0'; // Light color border
+  header.style.paddingBottom = '12px';
+
+  // Top row - Company logo on left, company details on right
+  const topRow = document.createElement('div');
+  topRow.style.display = 'flex';
+  topRow.style.justifyContent = 'space-between';
+  topRow.style.alignItems = 'flex-start';
+  topRow.style.width = '100%';
+  topRow.style.marginBottom = '10px';
+
+  // Left column - Company logo only
+  const leftColumn = document.createElement('div');
+  leftColumn.style.flex = '0 0 auto';
+  leftColumn.style.display = 'flex';
+  leftColumn.style.alignItems = 'flex-start';
+
+  if (companyLogoData) {
+    const companyLogo = document.createElement('img');
+    companyLogo.src = companyLogoData;
+    companyLogo.style.width = '120px'; 
+    companyLogo.style.height = '40px';
+    companyLogo.style.objectFit = 'cover';
+    leftColumn.appendChild(companyLogo);
+  }
+
+  // Right column - Company details only
+  const rightColumn = document.createElement('div');
+  rightColumn.style.flex = '0 0 auto';
+  rightColumn.style.textAlign = 'right';
+  rightColumn.style.display = 'flex';
+  rightColumn.style.flexDirection = 'column';
+  rightColumn.style.alignItems = 'flex-end';
+
+  const companyTitle = document.createElement('h3');
+  companyTitle.textContent = userData?.companyName || 'Company Name';
+  companyTitle.style.fontSize = '14px'; // Smaller for portrait
+  companyTitle.style.fontWeight = 'bold';
+  companyTitle.style.marginBottom = '3px';
+  companyTitle.style.color = '#1e40af';
+
+  const companyAddress = document.createElement('div');
+  companyAddress.innerHTML = `Address: ${userData?.companyAddress || 'N/A'}<br>`;
+  companyAddress.style.fontSize = '9px'; // Smaller for portrait
+  companyAddress.style.lineHeight = '1.2';
+  companyAddress.style.marginBottom = '3px';
+
+  const companyContact = document.createElement('div');
+  // Add contact details if needed
+  
+  rightColumn.appendChild(companyTitle);
+  rightColumn.appendChild(companyAddress);
+  rightColumn.appendChild(companyContact);
+
+  // Add both columns to topRow
+  topRow.appendChild(leftColumn);
+  topRow.appendChild(rightColumn);
+  header.appendChild(topRow);
+
+  // Bottom row - PDF title (centered)
+  const titleRow = document.createElement('div');
+  titleRow.style.textAlign = 'center';
+  titleRow.style.width = '100%';
+
+  const pdfTitle = document.createElement('h3');
+  pdfTitle.textContent = badgeTitle;
+  pdfTitle.style.fontSize = '16px'; // Adjusted for portrait
+  pdfTitle.style.fontWeight = 'bold';
+  pdfTitle.style.margin = '0';
+  pdfTitle.style.color = 'black';
+
+  titleRow.appendChild(pdfTitle);
+  header.appendChild(titleRow);
+  headerContainer.appendChild(header);
+
+  return headerContainer;
+};
+    // Function to create table for a specific page - optimized for A4 portrait
+    const createTableForPage = (pageData, pageNumber) => {
+      const tableContainer = document.createElement('div');
+      tableContainer.style.width = '750px'; // A4 portrait optimized width
+      tableContainer.style.padding = '15px';
+      tableContainer.style.paddingTop = '8px';
+      tableContainer.style.backgroundColor = 'white';
+      tableContainer.style.boxSizing = 'border-box';
+      tableContainer.style.color = '#000000';
+      tableContainer.style.fontFamily = 'Arial, sans-serif';
+
+      const table = document.createElement('table');
+      table.style.width = '100%';
+      table.style.borderCollapse = 'collapse';
+      table.style.fontFamily = 'Arial, sans-serif';
+      table.style.fontSize = '10px'; // Increased font size for table
+      table.style.marginTop = '8px';
+      table.style.color = '#000000';
+      table.style.textRendering = 'optimizeLegibility';
+      table.style.webkitFontSmoothing = 'antialiased';
+
+      // Table header
+      const thead = document.createElement('thead');
+      const headerRow = document.createElement('tr');
+      headerRow.style.backgroundColor = '#f0f0f0';
+      headerRow.style.border = '1px solid #d0d0d0'; // Light color border
+
+      if (filteredData[0]) {
+        Object.keys(filteredData[0]).forEach(key => {
+          const th = document.createElement('th');
+          th.textContent = formatHeader(key);
+          th.style.padding = '6px 4px'; // Increased padding for better readability
+          th.style.textAlign = columnTypes[key] === 'numeric' ? 'right' : 'left';
+          th.style.border = '1px solid #d0d0d0'; // Light color border
+          th.style.fontWeight = 'bold';
+          th.style.fontSize = '12px'; // Increased font size for headers
+          th.style.whiteSpace = 'nowrap';
+          headerRow.appendChild(th);
+        });
+      }
+
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      // Table body for current page - exactly 25 rows for consistent A4 portrait layout
+      const tbody = document.createElement('tbody');
+      pageData.forEach((row, index) => {
+        const tr = document.createElement('tr');
+        tr.style.border = '1px solid #d0d0d0'; // Light color border
+        tr.style.backgroundColor = index % 2 === 0 ? '#ffffff' : '#f8f8f8';
+
+        Object.keys(row).forEach(key => {
+          const td = document.createElement('td');
+          const cellValue = key.toLowerCase().includes("date") ? formatDate(row[key]) : row[key];
+          td.textContent = cellValue;
+          td.style.padding = '4px 3px'; // Increased padding
+          td.style.textAlign = columnTypes[key] === 'numeric' ? 'right' : 'left';
+          td.style.border = '1px solid #d0d0d0'; // Light color border
+          td.style.fontSize = '10px'; // Increased font size for cells
+          td.style.maxWidth = '80px'; // Smaller max width for portrait
+          td.style.overflow = 'hidden';
+          td.style.textOverflow = 'ellipsis';
+          td.style.whiteSpace = 'nowrap';
+          tr.appendChild(td);
+        });
+
+        tbody.appendChild(tr);
+      });
+
+      table.appendChild(tbody);
+      tableContainer.appendChild(table);
+
+      return tableContainer;
+    };
+
+    // Function to create footer - optimized for A4 portrait
+    const createFooter = (pageNumber, totalPages) => {
+      const footerContainer = document.createElement('div');
+      footerContainer.style.width = '750px';
+      footerContainer.style.padding = '15px';
+      footerContainer.style.paddingTop = '8px';
+      footerContainer.style.backgroundColor = 'white';
+      footerContainer.style.boxSizing = 'border-box';
+      footerContainer.style.color = '#000000';
+      footerContainer.style.fontFamily = 'Arial, sans-serif';
+
+      const currentDate = new Date();
+      const formattedDateTime = currentDate.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
+
+      // Page footer
+      const footer = document.createElement('div');
+      footer.style.display = 'flex';
+      footer.style.justifyContent = 'space-between';
+      footer.style.alignItems = 'center';
+      footer.style.marginTop = '15px';
+      footer.style.paddingTop = '8px';
+      footer.style.borderTop = '1px solid #e0e0e0'; // Light color border
+      footer.style.fontSize = '10px';
+      footer.style.color = '#666';
+
+      const dateTimeFooter = document.createElement('div');
+      dateTimeFooter.textContent = `Generated on: ${formattedDateTime}`;
+      
+      const pageInfo = document.createElement('div');
+      pageInfo.textContent = `Page ${pageNumber} of ${totalPages}`;
+      pageInfo.style.textAlign = 'center';
+      pageInfo.style.flex = '1';
+
+      const recordRange = document.createElement('div');
+      const startRecord = (pageNumber - 1) * ROWS_PER_PAGE + 1;
+      const endRecord = Math.min(pageNumber * ROWS_PER_PAGE, filteredData.length);
+      recordRange.textContent = `Records ${startRecord}-${endRecord}`;
+
+      footer.appendChild(dateTimeFooter);
+      footer.appendChild(pageInfo);
+      footer.appendChild(recordRange);
+      footerContainer.appendChild(footer);
+
+      return footerContainer;
+    };
+
+    // Generate each page with proper A4 scaling
+    for (let pageNumber = 1; pageNumber <= totalPages; pageNumber++) {
+      const startIndex = (pageNumber - 1) * ROWS_PER_PAGE;
+      const endIndex = startIndex + ROWS_PER_PAGE;
+      const pageData = filteredData.slice(startIndex, endIndex);
+
+      // Create temporary container for this page
+      const tempContainer = document.createElement('div');
+      tempContainer.style.position = 'fixed';
+      tempContainer.style.left = '-9999px';
+      tempContainer.style.top = '0';
+
+      // Add header
+      const headerContent = createHeaderContent();
+      tempContainer.appendChild(headerContent);
+
+      // Add table for this page
+      const tableContent = createTableForPage(pageData, pageNumber);
+      tempContainer.appendChild(tableContent);
+
+      // Add footer
+      const footerContent = createFooter(pageNumber, totalPages);
+      tempContainer.appendChild(footerContent);
+
+      // Add to document temporarily
+      document.body.appendChild(tempContainer);
+
+      // Generate canvas for this page with A4 portrait optimized settings
+      const canvas = await html2canvas(tempContainer, {
+        scale: 2, // Good balance for A4 quality
+        logging: false,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        width: 750, // Match container width for portrait
+        onclone: (clonedDoc) => {
+          const style = clonedDoc.createElement('style');
+          style.textContent = `
+            * {
+              text-rendering: optimizeLegibility !important;
+              -webkit-font-smoothing: antialiased !important;
+              -moz-osx-font-smoothing: grayscale !important;
+            }
+          `;
+          clonedDoc.head.appendChild(style);
+        }
+      });
+
+      // Add new page if not the first page
+      if (pageNumber > 1) {
+        pdf.addPage();
+      }
+
+      // Add image to PDF with proper A4 portrait margins and scaling
+      const imgData = canvas.toDataURL('image/png');
+      
+      // A4 portrait margins in mm
+      const marginTop = 10;
+      const marginSide = 10;
+      const marginBottom = 10;
+      
+      const maxWidth = pdfWidth - (marginSide * 2); // 190mm usable width
+      const maxHeight = pdfHeight - marginTop - marginBottom; // 277mm usable height
+      
+      const canvasAspectRatio = canvas.width / canvas.height;
+      const pageAspectRatio = maxWidth / maxHeight;
+      
+      let finalWidth, finalHeight;
+      
+      if (canvasAspectRatio > pageAspectRatio) {
+        finalWidth = maxWidth;
+        finalHeight = maxWidth / canvasAspectRatio;
+      } else {
+        finalHeight = maxHeight;
+        finalWidth = maxHeight * canvasAspectRatio;
+      }
+      
+      const centerX = (pdfWidth - finalWidth) / 2;
+      const startY = marginTop;
+
+      pdf.addImage(
+        imgData,
+        'PNG',
+        centerX,
+        startY,
+        finalWidth,
+        finalHeight,
+        undefined,
+        'SLOW'
+      );
+
+      // Clean up temporary container
+      document.body.removeChild(tempContainer);
+    }
+
+    // Save PDF with descriptive filename
+    setTimeout(() => {
+      pdf.save(`${badgeTitle.replace(/\s+/g, '_')}`);
+      setIsGeneratingPDF(false);
+    }, 500);
+
+  } catch (error) {
+    console.error('Error exporting to PDF:', error);
+    setIsGeneratingPDF(false);
+  }
+};
+
 // Excel-like Filter Component with Advanced Operators
 const ExcelFilter = ({ column }) => {
   const [searchFilter, setSearchFilter] = useState("");
@@ -838,22 +1109,48 @@ const ExcelFilter = ({ column }) => {
               )}
             </div>
           </div>
-
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handlePrint}
-              className="gap-1"
-            >
-              <Printer className="h-4 w-4" />
-              <span className="sr-only sm:not-sr-only">Print</span>
-            </Button>
-            <Button size="sm" onClick={handleDownloadExcel} className="gap-1">
-              <Download className="h-4 w-4" />
-              <span className="sr-only sm:not-sr-only">Export</span>
-            </Button>
-          </div>
+<div className="flex gap-2">
+  <Popover>
+    <PopoverTrigger asChild>
+      <Button size="sm" className="gap-1">
+        <Download className="h-4 w-4" />
+        <span className="sr-only sm:not-sr-only">Download</span>
+      </Button>
+    </PopoverTrigger>
+    <PopoverContent className="w-40 p-1" align="end">
+      <div className="space-y-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={exportToPDF}
+          disabled={isGeneratingPDF}
+          className="w-full justify-start gap-2 h-8"
+        >
+          {isGeneratingPDF ? (
+            <>
+              <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              <span>Generating...</span>
+            </>
+          ) : (
+            <>
+              <Printer className="h-3 w-3" />
+              <span>Print PDF</span>
+            </>
+          )}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleDownloadExcel}
+          className="w-full justify-start gap-2 h-8"
+        >
+          <Download className="h-3 w-3" />
+          <span>Export Excel</span>
+        </Button>
+      </div>
+    </PopoverContent>
+  </Popover>
+</div>
         </div>
       </div>
 

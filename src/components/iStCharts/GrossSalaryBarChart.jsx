@@ -27,7 +27,8 @@ export function GrossSalaryChart({ DashBoardID, ChartNo, chartTitle ,chartType: 
   const [selectedYAxes, setSelectedYAxes] = useState([])
   const [textFields, setTextFields] = useState([])
   const [numericFields, setNumericFields] = useState([])
-  
+  const [yAxisAggregations, setYAxisAggregations] = useState({});
+
   // Chart type selection - Added pie and donut
   const [chartType, setChartType] = useState(initialChartType) // bar, horizontalBar, line, area, pie, donut
   const [dbData, setDbData] = useState([])
@@ -260,119 +261,114 @@ useEffect(() => {
     fetchChartData()
   }
 }, [selectedXAxes, selectedYAxes])
+
 const fetchChartData = async () => {
   try {
-    const chartID = { DashBoardID, ChartNo }
+    const chartID = { DashBoardID, ChartNo };
     const res = await callSoapService(userData.clientURL, "BI_GetDashboard_Chart_Data", chartID);
-    
-    console.log("Fetched chart data:", res)
-    
-    // Separate fields by type
-    if (res.length > 0) {
-      const sampleData = res[0]
-      const allFields = Object.keys(sampleData)
-               
-      const textFieldsList = []
-      const numericFieldsList = []
-               
-      allFields.forEach(field => {
-        if (isNumericField(field, sampleData)) {
-          numericFieldsList.push(field)
-        } else {
-          textFieldsList.push(field)
-        }
-      })
-               
-      setTextFields(textFieldsList)
-      setNumericFields(numericFieldsList)
-      
-      // Set default axes if not already selected
-   if (selectedXAxes.length === 0) {
-  // Extract the part after colon if present
-  const processedChartXAxis = chartXAxis && chartXAxis.includes(':') 
-    ? chartXAxis.split(':')[1].trim() 
-    : chartXAxis;
-    
-  if (processedChartXAxis && textFieldsList.includes(processedChartXAxis)) {
-    setSelectedXAxes([processedChartXAxis])
-  } else if (textFieldsList.length > 0) {
-    setSelectedXAxes([textFieldsList[0]])
-  }
-}
 
-if (selectedYAxes.length === 0) {
-  // Extract the part after colon if present
-  const processedChartYAxis = chartYAxis && chartYAxis.includes(':') 
-    ? chartYAxis.split(':')[1].trim() 
-    : chartYAxis;
-    
-  if (processedChartYAxis && numericFieldsList.includes(processedChartYAxis)) {
-    setSelectedYAxes([processedChartYAxis])
-  } else if (numericFieldsList.length > 0) {
-    setSelectedYAxes([numericFieldsList[0]])
-  }
-}
-      
-      // Call grouping API only if we have both X and Y axes selected
-      if ((selectedXAxes.length > 0 || (chartXAxis && textFieldsList.includes(chartXAxis))) && 
-          (selectedYAxes.length > 0 || (chartYAxis && numericFieldsList.includes(chartYAxis)))) {
-        
-        // Prepare data for grouping API call
-        const inputJSONData = JSON.stringify(res); // Raw JSON data from first API call
-        
-     const processedChartXAxis = chartXAxis && chartXAxis.includes(':') 
-  ? chartXAxis.split(':')[1].trim() 
-  : chartXAxis;
-const processedChartYAxis = chartYAxis && chartYAxis.includes(':') 
-  ? chartYAxis.split(':')[1].trim() 
-  : chartYAxis;
+    console.log("Fetched chart data:", res);
 
-// Use selected X-axes or fallback to default
-const groupColumns = selectedXAxes.length > 0 ? 
-  selectedXAxes.join(",") : 
-  (processedChartXAxis && textFieldsList.includes(processedChartXAxis) ? processedChartXAxis : "");
+    if (!Array.isArray(res) || res.length === 0) {
+      console.warn("No data returned from BI_GetDashboard_Chart_Data");
+      setTasks([]);
+      return;
+    }
 
-// Use selected Y-axes or fallback to default
-let yAxisColumns = [];
-if (selectedYAxes.length > 0) {
-  yAxisColumns = selectedYAxes;
-} else if (processedChartYAxis && numericFieldsList.includes(processedChartYAxis)) {
-  yAxisColumns = [processedChartYAxis];
-} else if (numericFieldsList.length > 0) {
-  yAxisColumns = [numericFieldsList[0]];
-}
-        
-        const summaryColumns = yAxisColumns.map(col => `SUM:${col}`).join(",");
-        
-        const jsonDataID = {
-          inputJSONData: inputJSONData,
-          FilterCondition: "",
-          groupColumns: groupColumns,
-          summaryColumns: summaryColumns
-        }
-        
-        console.log("Grouped json:", inputJSONData);
-        console.log("Grouped col:", groupColumns);
-        console.log("Grouped sum:", summaryColumns);
+    const sampleData = res[0];
+    const allFields = Object.keys(sampleData);
 
-        // Call the grouping API with processed data
-        const groupedData = await callSoapService(userData.clientURL, "Data_Group_JSONValues", jsonDataID);
-        console.log("Grouped chart data:", groupedData);
-        
-        // Use the grouped data for the chart
-        setTasks(groupedData)
+    const textFieldsList = [];
+    const numericFieldsList = [];
+
+    allFields.forEach(field => {
+      if (isNumericField(field, sampleData)) {
+        numericFieldsList.push(field);
       } else {
-        // If no axes selected, use original data
-        setTasks(res)
+        textFieldsList.push(field);
+      }
+    });
+
+    setTextFields(textFieldsList);
+    setNumericFields(numericFieldsList);
+
+    // Determine X and Y axes
+    const processedChartXAxis = chartXAxis?.includes(":")
+      ? chartXAxis.split(":")[1].trim()
+      : chartXAxis;
+
+    const processedChartYAxis = chartYAxis?.includes(":")
+      ? chartYAxis.split(":")[1].trim()
+      : chartYAxis;
+
+    let finalXAxes = [...selectedXAxes];
+    if (finalXAxes.length === 0) {
+      if (processedChartXAxis && textFieldsList.includes(processedChartXAxis)) {
+        finalXAxes = [processedChartXAxis];
+      } else if (textFieldsList.length > 0) {
+        finalXAxes = [textFieldsList[0]];
+      }
+      setSelectedXAxes(finalXAxes);
+    }
+
+    let finalYAxes = [...selectedYAxes];
+    if (finalYAxes.length === 0) {
+      if (processedChartYAxis && numericFieldsList.includes(processedChartYAxis)) {
+        finalYAxes = [processedChartYAxis];
+      } else if (numericFieldsList.length > 0) {
+        finalYAxes = [numericFieldsList[0]];
+      }
+      setSelectedYAxes(finalYAxes);
+    }
+
+    // Grouping API logic
+    if (finalXAxes.length > 0 && finalYAxes.length > 0) {
+      // Escape JSON for SOAP XML
+      const rawJsonString = JSON.stringify(res);
+      const escapedJson = rawJsonString
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+
+      const groupColumns = finalXAxes.join(",");
+      const summaryColumns = finalYAxes
+      .map(col => {
+        const agg = yAxisAggregations[col] || "SUM";
+        return `${agg}:${col}`;
+      })
+      .join(",");
+
+      const groupingPayload = {
+        inputJSONData: escapedJson,
+        FilterCondition: "",
+        groupColumns: groupColumns,
+        summaryColumns: summaryColumns
+      };
+
+      console.log("Sending to Data_Group_JSONValues:", groupingPayload);
+
+      try {
+        const groupedData = await callSoapService(userData.clientURL, "Data_Group_JSONValues", groupingPayload);
+        console.log("Grouped chart data:", groupedData);
+        setTasks(groupedData);
+      } catch (groupingError) {
+        console.error("Grouping API failed:", groupingError);
+        setTasks(res); // Fallback to raw data
       }
     } else {
-      // If no data from first API call, set empty tasks
-      setTasks([])
+      console.warn("X or Y axis not selected properly. Showing raw data.");
+      setTasks(res);
     }
+
   } catch (error) {
-    console.error("Failed to fetch chart data", error)
+    console.error("Failed to fetch chart data", error);
+    setTasks([]);
   }
-}
+};
+
+
+
+
   const handleXAxisChange = (field, checked) => {
     if (checked) {
       setSelectedXAxes([...selectedXAxes, field])
@@ -388,7 +384,18 @@ if (selectedYAxes.length > 0) {
       setSelectedYAxes(selectedYAxes.filter(f => f !== field))
     }
   }
+  useEffect(() => {
+  if (DashBoardID && ChartNo && selectedYAxes.length > 0) {
+    fetchChartData();
+  }
+}, [yAxisAggregations]);
 
+const handleAggregationChange = (field, aggType) => {
+  setYAxisAggregations(prev => ({
+    ...prev,
+    [field]: aggType
+  }));
+};
   const removeXAxisField = (field) => {
     setSelectedXAxes(selectedXAxes.filter(f => f !== field))
   }
@@ -528,13 +535,31 @@ const processChartData = () => {
 // 3. Make sure this line comes AFTER the processChartData function:
 const chartData = processChartData()
 
-  const calculateTotal = (field) => {
-    return chartData.reduce((sum, item) => sum + (item[field] || 0), 0)
+const calculateTotal = (field) => {
+  const agg = yAxisAggregations[field] || "SUM";
+  const values = chartData.map(item => parseFloat(item[field]) || 0).filter(v => !isNaN(v));
+
+  switch (agg) {
+    case "AVG":
+      return values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+    case "COUNT":
+      return values.length;
+    case "SUM":
+    default:
+      return values.reduce((a, b) => a + b, 0);
   }
+};
+
 
 const formatValue = (value, fieldName = '') => {
   if (typeof value !== 'number') return value
   
+  const aggType = yAxisAggregations[fieldName] || "SUM";
+
+  //  Skip currency symbol if aggregation is COUNT
+  if (aggType === "COUNT") {
+    return value.toLocaleString(); 
+  }
   // Check if field name contains currency-related keywords
   const currencyKeywords = ['currency', 'curr', 'cost', 'value', 'amount', 'salary', 'salaries'];
   const fieldNameStr = String(fieldName || '');
@@ -2494,31 +2519,56 @@ return (
                     {numericFields.length}
                   </Badge>
                 </div>
-                <ScrollArea className="h-32">
-                  <div className="space-y-2">
-                    {numericFields.length > 0 ? (
-                      numericFields.map(field => (
-                        <div key={`y-${field}`} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`y-${field}`}
-                            checked={selectedYAxes.includes(field)}
-                            onCheckedChange={(checked) => handleYAxisChange(field, checked)}
-                          />
-                          <label
-                            htmlFor={`y-${field}`}
-                            className="text-xs cursor-pointer flex-1 truncate"
-                          >
-                            {formatFieldName(field)}
-                          </label>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-xs text-muted-foreground text-center py-4">
-                        No numeric fields found
-                      </p>
-                    )}
-                  </div>
-                </ScrollArea>
+                 <ScrollArea className="h-40">
+                     <div className="space-y-3">
+                       {numericFields.length > 0 ? (
+                         numericFields.map(field => (
+                           <div key={`y-${field}`} className="space-y-2 p-2 border rounded-md bg-gray-50 dark:bg-slate-900">
+                             <div className="flex items-center space-x-2">
+                               <Checkbox
+                                 id={`y-${field}`}
+                                 checked={selectedYAxes.includes(field)}
+                                 onCheckedChange={(checked) => handleYAxisChange(field, checked)}
+                               />
+                               <label
+                                 htmlFor={`y-${field}`}
+                                 className="text-xs cursor-pointer flex-1 truncate font-medium"
+                               >
+                                 {formatFieldName(field)}
+                               </label>
+                             </div>
+                             
+                             {/* Aggregation type buttons - only show if field is selected */}
+                             {selectedYAxes.includes(field) && (
+                               <div className="ml-6 space-y-2">
+                                 {/* <label className="text-xs text-muted-foreground block">Aggregation Type:</label> */}
+                                 <div className="flex gap-1">
+                                   {['SUM', 'AVG', 'COUNT'].map((aggType) => (
+                                     <button
+                                       key={aggType}
+                                       type="button"
+                                       onClick={() => handleAggregationChange(field, aggType)}
+                                       className={`px-2 py-1 text-xs rounded-md border transition-all duration-200 ${
+                                         (yAxisAggregations[field] || 'SUM') === aggType
+                                           ? 'bg-blue-500 text-white border-blue-500 shadow-sm'
+                                           : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-slate-700'
+                                       }`}
+                                     >
+                                       {aggType}
+                                     </button>
+                                   ))}
+                                 </div>
+                               </div>
+                             )}
+                           </div>
+                         ))
+                       ) : (
+                         <p className="text-xs text-muted-foreground text-center py-4">
+                           No numeric fields found
+                         </p>
+                       )}
+                     </div>
+                   </ScrollArea>
               </div>
             </PopoverContent>
           </Popover>
@@ -2641,7 +2691,7 @@ return (
           {selectedYAxes.map(field => (
             <div key={field} className="bg-white dark:bg-slate-950 p-3 rounded-lg border shadow-sm hover:shadow-md transition-shadow">
               <div className="text-xs font-medium text-muted-foreground mb-1 truncate">
-                {formatFieldName(field)}
+                 {(yAxisAggregations[field] || 'SUM')} of {formatFieldName(field)}
               </div>
               <div className="text-sm font-bold text-gray-900 dark:text-gray-100 truncate">
                {formatValue(calculateTotal(field), field)}

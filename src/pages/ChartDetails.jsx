@@ -200,7 +200,7 @@ const getFilteredData = () => {
             
             return totals
           }
-          const filterCondition = filterConditions.length > 0 ? filterConditions.join(" AND ") : ""
+          const filterCondition = filterConditions.length > 0 ? filterConditions.join(",") : ""
           
           // Determine all available fields from the raw data
           const allFields = Object.keys(rawData[0])
@@ -219,13 +219,15 @@ const getFilteredData = () => {
           }
           
           console.log("Filter condition:", filterCondition)
-          console.log("Group columns:", groupColumns)
-          console.log("Summary columns:", summaryColumns)
+    
           
           // Only call the grouping API if we have valid filter conditions
           if (filterCondition && filterCondition.trim() !== "") {
             const jsonDataID = {
-              inputJSONData: inputJSONData,
+              inputJSONData: inputJSONData
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;"),
               FilterCondition: filterCondition,
               groupColumns:  "",
               summaryColumns:  ""

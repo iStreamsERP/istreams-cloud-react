@@ -395,7 +395,7 @@ const createHeaderContent = () => {
       // Table header
       const thead = document.createElement('thead');
       const headerRow = document.createElement('tr');
-      headerRow.style.backgroundColor = '#f0f0f0';
+      headerRow.style.backgroundColor = '#ffffff';
       headerRow.style.border = '1px solid #d0d0d0'; // Light color border
 
       if (filteredData[0]) {
@@ -420,7 +420,9 @@ const createHeaderContent = () => {
       pageData.forEach((row, index) => {
         const tr = document.createElement('tr');
         tr.style.border = '1px solid #d0d0d0'; // Light color border
-        tr.style.backgroundColor = index % 2 === 0 ? '#ffffff' : '#f8f8f8';
+        // tr.style.backgroundColor = index % 2 === 0 ? '#ffffff' : '#f8f8f8';
+        tr.style.backgroundColor = '#ffffff';
+
 
         Object.keys(row).forEach(key => {
           const td = document.createElement('td');

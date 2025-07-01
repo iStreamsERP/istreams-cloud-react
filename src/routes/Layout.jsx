@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { useClickOutside } from "../hooks/use-click-outside";
 import Footer from "@/layouts/Footer";
 import { Toaster } from "@/components/ui/toaster"
-
+import ChatbotUI from "@/components/ChatbotUI";
 
 const Layout = () => {
   const isDesktopDevice = useMediaQuery("(min-width: 768px)");
@@ -46,6 +46,7 @@ const Layout = () => {
         </main>
         <Footer />
       </div>
+      <ChatbotUI />
     </div>
   );
 };

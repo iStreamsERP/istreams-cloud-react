@@ -19,6 +19,7 @@ import jsPDF from 'jspdf';
 import html2canvas from "html2canvas"
 import { callSoapService } from "@/services/callSoapService"
 import { useNavigate } from "react-router-dom"
+import ChatbotUI from "../ChatbotUI"
 export function GrossSalaryChart({ DashBoardID, ChartNo, chartTitle ,chartType: initialChartType = "bar", chartXAxis, chartYAxis }) {
   const { userData } = useAuth()
   const [tasks, setTasks] = useState([])
@@ -2339,6 +2340,23 @@ return (
                   </div>
                 </PopoverContent>
               </Popover>
+
+             <Button
+              variant="outline"
+              size="sm"
+              className="ml-2 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900 dark:to-blue-900 border-purple-200 dark:border-purple-700 hover:shadow-lg transition-all duration-200"
+              onClick={() => {
+                localStorage.setItem("chatbot_context", JSON.stringify({
+                  DashBoardID,
+                  ChartNo,
+                  chartTitle
+                }));
+                document.getElementById("open-chatbot-btn")?.click();
+              }}
+            >
+              Ask AI
+            </Button>
+
         </div>
       </div>
     </div>
@@ -2771,6 +2789,8 @@ return (
       </div>
     )}
   </CardContent>
+
 </Card>
+
 )
 }

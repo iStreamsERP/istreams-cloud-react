@@ -2,18 +2,21 @@ import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, Minimize2 } from 'lucide-react';
 import { callSoapService } from '@/services/callSoapService';
 import { useAuth } from '@/contexts/AuthContext';
+import axios from 'axios';
+
 const ChatbotUI = () => {
-  const { userData } = useAuth()
+  const { userData } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [messages, setMessages] = useState([
     {
       id: 1,
-      text: "Hello! How can I help you today?",
+      text: "Hello!",
       sender: 'bot',
       timestamp: new Date()
     }
   ]);
+  const [chartContext, setChartContext] = useState(null);
   const [inputMessage, setInputMessage] = useState('');
   const [chartData, setChartData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -27,86 +30,97 @@ const ChatbotUI = () => {
     scrollToBottom();
   }, [messages]);
 
-  useEffect(() => {
-    const fetchChartData = async () => {
-      try {
-    
-        const chartID = { DashBoardID: 1, ChartNo: 1 };
-        const res = await callSoapService(userData.clientURL, "BI_GetDashboard_Chart_Data", chartID);
-        console.log("bot:", res);
+  const fetchChartData = async (DashBoardID, ChartNo) => {
+    try {
+      const chartID = { DashBoardID, ChartNo };
+      const res = await callSoapService(userData.clientURL, "BI_GetDashboard_Chart_Data", chartID);
+      setChartData(res);
+    } catch (error) {
+      console.error("Chart data fetch failed:", error);
+      setChartData({ error: "Unable to fetch chart data." });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-        setChartData(res);
-      } catch (error) {
-        console.error("Chart data fetch failed:", error);
-        setChartData({ error: "Unable to fetch chart data." });
-      } finally {
-        setIsLoading(false);
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const contextStr = localStorage.getItem("chatbot_context");
+      if (contextStr) {
+        const context = JSON.parse(contextStr);
+        setChartContext(context);
+
+        setMessages([
+          {
+            id: Date.now(),
+            text: `How can I help you about "${context.chartTitle}" datas?`,
+            sender: "bot",
+            timestamp: new Date()
+          }
+        ]);
+
+        fetchChartData(context.DashBoardID, context.ChartNo);
       }
     };
 
-    fetchChartData();
+    handleStorageChange();
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
 
-  const handleSendMessage = (e) => {
+  const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!inputMessage.trim()) return;
 
-    const newMessage = {
+    const userMessage = {
       id: Date.now(),
       text: inputMessage,
       sender: 'user',
       timestamp: new Date()
     };
 
-    setMessages(prev => [...prev, newMessage]);
+    setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
 
-    // Simulate bot response
-    setTimeout(() => {
-      let botReply = "I'm here to help you. Try asking about chart data!";
+    const loadingMsgId = Date.now() + 1;
 
-     if (chartData) {
-  if (chartData.error) {
-    botReply = "Sorry, I couldn't load the dashboard data.";
-  } else if (inputMessage.toLowerCase().includes("chart") || inputMessage.toLowerCase().includes("data")) {
-   botReply = Array.isArray(chartData)
-  ? chartData.map((item, index) => {
-      if (typeof item === 'object') {
-        return `Item ${index + 1}:\n${Object.entries(item)
-          .map(([k, v]) => `  ${k}: ${v}`)
-          .join('\n')}`;
-      } else {
-        return `Item ${index + 1}: ${item}`;
-      }
-    }).join('\n\n')
-  : Object.entries(chartData)
-      .map(([key, value]) => {
-        if (typeof value === 'object') {
-          return `${key}:\n${Object.entries(value)
-            .map(([k, v]) => `  ${k}: ${v}`)
-            .join('\n')}`;
-        } else {
-          return `${key}: ${value}`;
-        }
-      }).join('\n');
+    const loadingMessage = {
+      id: loadingMsgId,
+      text: "Generating...",
+      sender: 'bot',
+      timestamp: new Date()
+    };
 
-  }
-}
- else if (isLoading) {
-        botReply = "I'm still loading chart data. Please wait a moment.";
-      }
+    setMessages(prev => [...prev, loadingMessage]);
 
-      const botResponse = {
-        id: Date.now() + 1,
-        text: botReply,
-        sender: 'bot',
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, botResponse]);
-    }, 1000);
+    const formData = new FormData();
+    const blob = new Blob([JSON.stringify(chartData)], { type: 'application/json' });
+    formData.append('File', blob, 'chartData.json');
+    formData.append('Question', inputMessage);
+
+    try {
+      const response = await axios.post('https://apps.istreams-erp.com:4491/api/OpenAI/ask-from-file', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      setMessages(prev =>
+        prev.map(msg =>
+          msg.id === loadingMsgId ? { ...msg, text: response.data } : msg
+        )
+      );
+    } catch (err) {
+      setMessages(prev =>
+        prev.map(msg =>
+          msg.id === loadingMsgId
+            ? { ...msg, text: "Error processing your question. " + (err.response?.data || err.message) }
+            : msg
+        )
+      );
+    }
   };
 
   const toggleChat = () => {
+    if (isOpen) localStorage.removeItem("chatbot_context");
     setIsOpen(!isOpen);
     setIsMinimized(false);
   };
@@ -116,6 +130,28 @@ const ChatbotUI = () => {
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
+      <button
+        id="open-chatbot-btn"
+        className="hidden"
+        onClick={() => {
+          const contextStr = localStorage.getItem("chatbot_context");
+          if (contextStr) {
+            const context = JSON.parse(contextStr);
+            setChartContext(context);
+            setMessages([
+              {
+                id: Date.now(),
+                text: `How can I help you about "${context.chartTitle}" datas?`,
+                sender: "bot",
+                timestamp: new Date(),
+              },
+            ]);
+            fetchChartData(context.DashBoardID, context.ChartNo);
+          }
+          setIsOpen(true);
+        }}
+      />
+
       {!isOpen && (
         <button
           onClick={toggleChat}

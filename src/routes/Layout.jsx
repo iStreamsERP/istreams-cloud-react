@@ -46,7 +46,7 @@ const Layout = () => {
         </main>
         <Footer />
       </div>
-      <ChatbotUI />
+      {/* <ChatbotUI /> */}
     </div>
   );
 };

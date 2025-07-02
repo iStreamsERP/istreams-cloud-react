@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 import ProgressTable from "@/components/iStTables/ProgressTable";
 import { callSoapService } from "@/services/callSoapService";
-
+import ChatbotUI from "@/components/ChatbotUI";
 const AnimatedNumber = ({ value, generateRandomValue }) => {
   const [displayValue, setDisplayValue] = useState(generateRandomValue());
 
@@ -335,6 +335,7 @@ const DashboardPage = () => {
           ))}
         </div>
       )}
+      <ChatbotUI />
     </div>
   );
 };

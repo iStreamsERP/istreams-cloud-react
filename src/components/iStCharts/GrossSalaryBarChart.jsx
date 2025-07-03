@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
-import { ChevronDown, X, BarChart3, TrendingUp, Settings, Palette, Eye, Download, Activity, AreaChart as AreaChartIcon, BarChart4, PieChart as PieChartIcon } from "lucide-react"
+import { ChevronDown, X, BarChart3, TrendingUp, Settings, Palette, Eye, Download, Activity, AreaChart as AreaChartIcon, BarChart4, PieChart as PieChartIcon,MessageCircle ,Sparkles,Zap,Brain,Cpu} from "lucide-react"
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { toPng } from 'html-to-image';
 import jsPDF from 'jspdf';
@@ -2340,11 +2340,13 @@ return (
                   </div>
                 </PopoverContent>
               </Popover>
-
-             <Button
+ <TooltipProvider>
+  <FormateTooltip>
+      <TooltipTrigger asChild>
+        <Button
               variant="outline"
               size="sm"
-              className="ml-2 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900 dark:to-blue-900 border-purple-200 dark:border-purple-700 hover:shadow-lg transition-all duration-200"
+              className="ml-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg transition-all duration-300 hover:scale-90 hover:shadow-xl"
               onClick={() => {
                 localStorage.setItem("chatbot_context", JSON.stringify({
                   DashBoardID,
@@ -2354,8 +2356,16 @@ return (
                 document.getElementById("open-chatbot-btn")?.click();
               }}
             >
-              Ask AI
+                <Sparkles className=" h-3 w-3" /> 
             </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>ASK AI</p>
+      </TooltipContent>
+    </FormateTooltip>
+    
+ </TooltipProvider>
+             
 
         </div>
       </div>

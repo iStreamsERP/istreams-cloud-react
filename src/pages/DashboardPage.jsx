@@ -335,7 +335,7 @@ const DashboardPage = () => {
           ))}
         </div>
       )}
-      <ChatbotUI />
+      {/* <ChatbotUI /> */}
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Minimize2 } from 'lucide-react';
+import { MessageCircle, X, Send, Minimize2 ,Sparkles} from 'lucide-react';
 import { callSoapService } from '@/services/callSoapService';
 import { useAuth } from '@/contexts/AuthContext';
 import axios from 'axios';
@@ -159,7 +159,7 @@ const ChatbotUI = () => {
         >
           <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 opacity-75 blur-md animate-pulse"></div>
           <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 opacity-50 blur-lg animate-ping"></div>
-          <MessageCircle className="relative z-10 h-6 w-6" />
+          <Sparkles className="relative z-10 h-6 w-6" />
           <div className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 flex items-center justify-center">
             <span className="text-xs font-bold text-white">1</span>
           </div>

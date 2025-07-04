@@ -1807,14 +1807,245 @@ return (
     {/* Top row: Title and Controls */}
   <div className="flex flex-wrap gap-4 items-center justify-between">
       {/* Title and Display Format */}
+      <div className="flex gap-2">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center min-w-0 flex-shrink">
         <h3 className="text-lg sm:text-xl font-bold truncate flex flex-col gap-1 ">     
           {chartTitle}
-          <span className="text-sm">CurrencyType:{userData.companyCurrName}</span>
+          <span className="text-sm">in {userData.companyCurrName}</span>
         </h3>
        
       </div>
-      
+
+        {/* Single line: X-Axis, Y-Axis, and Range */}
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+        
+       
+      {/* X-Axis Selection */}
+        <div className="flex-1 space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="p-1 bg-blue-100 dark:bg-blue-900 rounded flex-shrink-0">
+              <BarChart3 className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+            </div>
+            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+              X-Axis
+            </label>
+          </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button 
+                variant="outline" 
+                className="w-full justify-between bg-white dark:bg-slate-950 shadow-sm hover:shadow-md transition-shadow text-xs h-9"
+              >
+                <span className="truncate">
+                  {selectedXAxes.length > 0 ? selectedXAxes.map(field => formatFieldName(field)).join(', ') : 'Select'}
+                </span>
+                <ChevronDown className="h-3 w-3 flex-shrink-0" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[320px] sm:w-96" align="start">
+              <div className="space-y-4">
+                {/* Field Selection Section */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium text-xs">Select Text/String Fields</h4>
+                    <Badge variant="secondary" className="text-xs">
+                      {textFields.length}
+                    </Badge>
+                  </div>
+                  <ScrollArea className="h-32">
+                    <div className="space-y-2">
+                      {textFields.length > 0 ? (
+                        textFields.map(field => (
+                          <div key={`x-${field}`} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`x-${field}`}
+                              checked={selectedXAxes.includes(field)}
+                              onCheckedChange={(checked) => handleXAxisChange(field, checked)}
+                            />
+                            <label
+                              htmlFor={`x-${field}`}
+                              className="text-xs cursor-pointer flex-1 truncate"
+                            >
+                              {formatFieldName(field)}
+                            </label>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-xs text-muted-foreground text-center py-4">
+                          No text fields found
+                        </p>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
+
+                {/* Category Filters Section - Only show if fields are selected */}
+                {selectedXAxes.length > 0 && Object.keys(availableCategories).length > 0 && (
+                  <>
+                    <Separator />
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1 bg-orange-100 dark:bg-orange-900 rounded flex-shrink-0">
+                          <Eye className="h-3 w-3 text-orange-600 dark:text-orange-400" />
+                        </div>
+                        <h4 className="font-medium text-xs">Category Filters</h4>
+                      </div>
+                      
+                      <ScrollArea className="h-48">
+                        <div className="space-y-3">
+                          {selectedXAxes.map(field => (
+                            <div key={`category-filter-${field}`} className="space-y-2 p-2 border rounded-md bg-gray-50 dark:bg-slate-900">
+                              <div className="flex items-center justify-between">
+                                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
+                                  {formatFieldName(field)}
+                                </label>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="secondary" className="text-xs">
+                                    {(selectedCategories[field] || []).length}/{(availableCategories[field] || []).length}
+                                  </Badge>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => selectAllCategories(field)}
+                                      className="text-xs h-5 px-1"
+                                    >
+                                      All
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => deselectAllCategories(field)}
+                                      className="text-xs h-5 px-1"
+                                    >
+                                      None
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <div className="max-h-24 overflow-y-auto">
+                                <div className="space-y-1">
+                                  {(availableCategories[field] || []).map(value => (
+                                    <div key={`${field}-${value}`} className="flex items-center space-x-2">
+                                      <Checkbox
+                                        id={`${field}-${value}`}
+                                        checked={(selectedCategories[field] || []).includes(value)}
+                                        onCheckedChange={(checked) => handleCategoryChange(field, value, checked)}
+                                      />
+                                      <label
+                                        htmlFor={`${field}-${value}`}
+                                        className="text-xs cursor-pointer flex-1 break-words"
+                                        title={value}
+                                      >
+                                        {String(value).length > 20 ? `${String(value).substring(0, 20)}...` : String(value)}
+                                      </label>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="text-xs text-muted-foreground text-center border-t pt-1">
+                                {(selectedCategories[field] || []).length} of {(availableCategories[field] || []).length} selected
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  </>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        {/* Y-Axis Selection */}
+        <div className="flex-1 space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="p-1 bg-green-100 dark:bg-green-900 rounded flex-shrink-0">
+              <TrendingUp className="h-3 w-3 text-green-600 dark:text-green-400" />
+            </div>
+            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+              Y-Axis
+            </label>
+          </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button 
+                variant="outline" 
+                className="w-full justify-between bg-white dark:bg-slate-950 shadow-sm hover:shadow-md transition-shadow text-xs h-9"
+              >
+                <span className="truncate">
+                  {selectedYAxes.length > 0 ? selectedYAxes.map(field => formatFieldName(field)).join(', ') : 'Select'}
+                </span>
+                <ChevronDown className="h-3 w-3 flex-shrink-0" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[280px] sm:w-80" align="start">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-xs">Select Numeric Fields</h4>
+                  <Badge variant="secondary" className="text-xs">
+                    {numericFields.length}
+                  </Badge>
+                </div>
+                 <ScrollArea className="h-40">
+                     <div className="space-y-3">
+                       {numericFields.length > 0 ? (
+                         numericFields.map(field => (
+                           <div key={`y-${field}`} className="space-y-2 p-2 border rounded-md bg-gray-50 dark:bg-slate-900">
+                             <div className="flex items-center space-x-2">
+                               <Checkbox
+                                 id={`y-${field}`}
+                                 checked={selectedYAxes.includes(field)}
+                                 onCheckedChange={(checked) => handleYAxisChange(field, checked)}
+                               />
+                               <label
+                                 htmlFor={`y-${field}`}
+                                 className="text-xs cursor-pointer flex-1 truncate font-medium"
+                               >
+                                 {formatFieldName(field)}
+                               </label>
+                             </div>
+                             
+                             {/* Aggregation type buttons - only show if field is selected */}
+                             {selectedYAxes.includes(field) && (
+                               <div className="ml-6 space-y-2">
+                                 {/* <label className="text-xs text-muted-foreground block">Aggregation Type:</label> */}
+                                 <div className="flex gap-1">
+                                   {['SUM', 'AVG', 'COUNT'].map((aggType) => (
+                                     <button
+                                       key={aggType}
+                                       type="button"
+                                       onClick={() => handleAggregationChange(field, aggType)}
+                                       className={`px-2 py-1 text-xs rounded-md border transition-all duration-200 ${
+                                         (yAxisAggregations[field] || 'SUM') === aggType
+                                           ? 'bg-blue-500 text-white border-blue-500 shadow-sm'
+                                           : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-slate-700'
+                                       }`}
+                                     >
+                                       {aggType}
+                                     </button>
+                                   ))}
+                                 </div>
+                               </div>
+                             )}
+                           </div>
+                         ))
+                       ) : (
+                         <p className="text-xs text-muted-foreground text-center py-4">
+                           No numeric fields found
+                         </p>
+                       )}
+                     </div>
+                   </ScrollArea>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+    
+      </div>
+      </div>
       {/* Chart Type and Action Buttons */}
       <div className="flex flex-wrap gap-2 items-center justify-between sm:justify-between min-w-fit">
         {/* Chart Type Selection */}
@@ -2340,31 +2571,31 @@ return (
                   </div>
                 </PopoverContent>
               </Popover>
- <TooltipProvider>
-  <FormateTooltip>
-      <TooltipTrigger asChild>
-        <Button
-              variant="outline"
-              size="sm"
-              className="ml-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg transition-all duration-300 hover:scale-90 hover:shadow-xl"
-              onClick={() => {
-                localStorage.setItem("chatbot_context", JSON.stringify({
-                  DashBoardID,
-                  ChartNo,
-                  chartTitle
-                }));
-                document.getElementById("open-chatbot-btn")?.click();
-              }}
-            >
-                <Sparkles className=" h-3 w-3" /> 
-            </Button>
-      </TooltipTrigger>
-      <TooltipContent>
-        <p>ASK AI</p>
-      </TooltipContent>
-    </FormateTooltip>
-    
- </TooltipProvider>
+          <TooltipProvider>
+            <FormateTooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                        variant="outline"
+                        size="sm"
+                        className="bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg transition-all duration-300 hover:scale-90 hover:shadow-xl"
+                        onClick={() => {
+                          localStorage.setItem("chatbot_context", JSON.stringify({
+                            DashBoardID,
+                            ChartNo,
+                            chartTitle
+                          }));
+                          document.getElementById("open-chatbot-btn")?.click();
+                        }}
+                      >
+                          <Sparkles className=" h-3 w-3" /> 
+                      </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>ASK AI</p>
+                </TooltipContent>
+              </FormateTooltip>
+              
+          </TooltipProvider>
              
 
         </div>
@@ -2374,236 +2605,35 @@ return (
 
     <div className="space-y-4 mb-4 sm:mb-6 flex flex-row gap-2 items-center justify-between flex-wrap">
        
-      {/* Single line: X-Axis, Y-Axis, and Range */}
-      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-        
-       
-      {/* X-Axis Selection */}
-        <div className="flex-1 space-y-2">
-          <div className="flex items-center gap-2">
-            <div className="p-1 bg-blue-100 dark:bg-blue-900 rounded flex-shrink-0">
-              <BarChart3 className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-            </div>
-            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-              X-Axis
-            </label>
-          </div>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button 
-                variant="outline" 
-                className="w-full justify-between bg-white dark:bg-slate-950 shadow-sm hover:shadow-md transition-shadow text-xs h-9"
-              >
-                <span className="truncate">
-                  {selectedXAxes.length > 0 ? selectedXAxes.map(field => formatFieldName(field)).join(', ') : 'Select'}
-                </span>
-                <ChevronDown className="h-3 w-3 flex-shrink-0" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[320px] sm:w-96" align="start">
-              <div className="space-y-4">
-                {/* Field Selection Section */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium text-xs">Select Text/String Fields</h4>
-                    <Badge variant="secondary" className="text-xs">
-                      {textFields.length}
-                    </Badge>
-                  </div>
-                  <ScrollArea className="h-32">
-                    <div className="space-y-2">
-                      {textFields.length > 0 ? (
-                        textFields.map(field => (
-                          <div key={`x-${field}`} className="flex items-center space-x-2">
-                            <Checkbox
-                              id={`x-${field}`}
-                              checked={selectedXAxes.includes(field)}
-                              onCheckedChange={(checked) => handleXAxisChange(field, checked)}
-                            />
-                            <label
-                              htmlFor={`x-${field}`}
-                              className="text-xs cursor-pointer flex-1 truncate"
-                            >
-                              {formatFieldName(field)}
-                            </label>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-xs text-muted-foreground text-center py-4">
-                          No text fields found
-                        </p>
-                      )}
-                    </div>
-                  </ScrollArea>
-                </div>
-
-                {/* Category Filters Section - Only show if fields are selected */}
-                {selectedXAxes.length > 0 && Object.keys(availableCategories).length > 0 && (
-                  <>
-                    <Separator />
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2">
-                        <div className="p-1 bg-orange-100 dark:bg-orange-900 rounded flex-shrink-0">
-                          <Eye className="h-3 w-3 text-orange-600 dark:text-orange-400" />
-                        </div>
-                        <h4 className="font-medium text-xs">Category Filters</h4>
-                      </div>
-                      
-                      <ScrollArea className="h-48">
-                        <div className="space-y-3">
-                          {selectedXAxes.map(field => (
-                            <div key={`category-filter-${field}`} className="space-y-2 p-2 border rounded-md bg-gray-50 dark:bg-slate-900">
-                              <div className="flex items-center justify-between">
-                                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
-                                  {formatFieldName(field)}
-                                </label>
-                                <div className="flex items-center gap-2">
-                                  <Badge variant="secondary" className="text-xs">
-                                    {(selectedCategories[field] || []).length}/{(availableCategories[field] || []).length}
-                                  </Badge>
-                                  <div className="flex gap-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => selectAllCategories(field)}
-                                      className="text-xs h-5 px-1"
-                                    >
-                                      All
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => deselectAllCategories(field)}
-                                      className="text-xs h-5 px-1"
-                                    >
-                                      None
-                                    </Button>
-                                  </div>
-                                </div>
-                              </div>
-                              
-                              <div className="max-h-24 overflow-y-auto">
-                                <div className="space-y-1">
-                                  {(availableCategories[field] || []).map(value => (
-                                    <div key={`${field}-${value}`} className="flex items-center space-x-2">
-                                      <Checkbox
-                                        id={`${field}-${value}`}
-                                        checked={(selectedCategories[field] || []).includes(value)}
-                                        onCheckedChange={(checked) => handleCategoryChange(field, value, checked)}
-                                      />
-                                      <label
-                                        htmlFor={`${field}-${value}`}
-                                        className="text-xs cursor-pointer flex-1 break-words"
-                                        title={value}
-                                      >
-                                        {String(value).length > 20 ? `${String(value).substring(0, 20)}...` : String(value)}
-                                      </label>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                              <div className="text-xs text-muted-foreground text-center border-t pt-1">
-                                {(selectedCategories[field] || []).length} of {(availableCategories[field] || []).length} selected
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </ScrollArea>
-                    </div>
-                  </>
-                )}
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
-
-        {/* Y-Axis Selection */}
-        <div className="flex-1 space-y-2">
-          <div className="flex items-center gap-2">
-            <div className="p-1 bg-green-100 dark:bg-green-900 rounded flex-shrink-0">
-              <TrendingUp className="h-3 w-3 text-green-600 dark:text-green-400" />
-            </div>
-            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-              Y-Axis
-            </label>
-          </div>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button 
-                variant="outline" 
-                className="w-full justify-between bg-white dark:bg-slate-950 shadow-sm hover:shadow-md transition-shadow text-xs h-9"
-              >
-                <span className="truncate">
-                  {selectedYAxes.length > 0 ? selectedYAxes.map(field => formatFieldName(field)).join(', ') : 'Select'}
-                </span>
-                <ChevronDown className="h-3 w-3 flex-shrink-0" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[280px] sm:w-80" align="start">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-medium text-xs">Select Numeric Fields</h4>
-                  <Badge variant="secondary" className="text-xs">
-                    {numericFields.length}
-                  </Badge>
-                </div>
-                 <ScrollArea className="h-40">
-                     <div className="space-y-3">
-                       {numericFields.length > 0 ? (
-                         numericFields.map(field => (
-                           <div key={`y-${field}`} className="space-y-2 p-2 border rounded-md bg-gray-50 dark:bg-slate-900">
-                             <div className="flex items-center space-x-2">
-                               <Checkbox
-                                 id={`y-${field}`}
-                                 checked={selectedYAxes.includes(field)}
-                                 onCheckedChange={(checked) => handleYAxisChange(field, checked)}
-                               />
-                               <label
-                                 htmlFor={`y-${field}`}
-                                 className="text-xs cursor-pointer flex-1 truncate font-medium"
-                               >
-                                 {formatFieldName(field)}
-                               </label>
-                             </div>
-                             
-                             {/* Aggregation type buttons - only show if field is selected */}
-                             {selectedYAxes.includes(field) && (
-                               <div className="ml-6 space-y-2">
-                                 {/* <label className="text-xs text-muted-foreground block">Aggregation Type:</label> */}
-                                 <div className="flex gap-1">
-                                   {['SUM', 'AVG', 'COUNT'].map((aggType) => (
-                                     <button
-                                       key={aggType}
-                                       type="button"
-                                       onClick={() => handleAggregationChange(field, aggType)}
-                                       className={`px-2 py-1 text-xs rounded-md border transition-all duration-200 ${
-                                         (yAxisAggregations[field] || 'SUM') === aggType
-                                           ? 'bg-blue-500 text-white border-blue-500 shadow-sm'
-                                           : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-slate-700'
-                                       }`}
-                                     >
-                                       {aggType}
-                                     </button>
-                                   ))}
-                                 </div>
-                               </div>
-                             )}
-                           </div>
-                         ))
-                       ) : (
-                         <p className="text-xs text-muted-foreground text-center py-4">
-                           No numeric fields found
-                         </p>
-                       )}
-                     </div>
-                   </ScrollArea>
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
     
-      </div>
-       {/* Range Slider - Inline */}
+    
+     
+    </div>
+
+    <Separator />
+
+    {/* Totals Display */}
+    {selectedYAxes.length > 0 && (
+      
+      <div className="flex flex-row items-center justify-between">
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2 ">
+          
+          {selectedYAxes.map(field => (
+            <div key={field} className="bg-white dark:bg-slate-950 p-3 rounded-lg border shadow-sm hover:shadow-md transition-shadow">
+              <div className="text-xs font-medium text-muted-foreground mb-1 truncate">
+                 {(yAxisAggregations[field] || 'SUM')} of {formatFieldName(field)}
+              </div>
+              <div className="text-sm font-bold text-gray-900 dark:text-gray-100 truncate">
+               {formatValue(calculateTotal(field), field)}
+              </div>
+            </div>
+          ))}
+          
+        </div>
+ 
+   {/* Range Slider - Inline */}
+   <div className="flex gap-1">
       <div className="w-[200px]">
             {selectedYAxes.length > 0 && selectedRangeField && (
           <div className="flex-1 space-y-2">
@@ -2703,82 +2733,58 @@ return (
           </div>
         )}
       </div>
-         
-     
-    </div>
-
-    <Separator />
-
-    {/* Totals Display */}
-    {selectedYAxes.length > 0 && (
-      
-      <div className="mt-4 sm:mt-6 flex flex-row items-center justify-between">
+              <TooltipProvider>
+      <div className="flex flex-col p-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
+        <FormateTooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="sm"
+              variant={displayFormat === "D" ? "default" : "ghost"}
+              onClick={() => setDisplayFormat("D")}
+              className={`flex-1 text-xs px-2 py-1 ${displayFormat === "D" ? "shadow-sm" : ""}`}
+            >
+              D
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Show values in default</p>
+          </TooltipContent>
+        </FormateTooltip>
         
-        <div className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-3 gap-3 ">
-          
-          {selectedYAxes.map(field => (
-            <div key={field} className="bg-white dark:bg-slate-950 p-3 rounded-lg border shadow-sm hover:shadow-md transition-shadow">
-              <div className="text-xs font-medium text-muted-foreground mb-1 truncate">
-                 {(yAxisAggregations[field] || 'SUM')} of {formatFieldName(field)}
-              </div>
-              <div className="text-sm font-bold text-gray-900 dark:text-gray-100 truncate">
-               {formatValue(calculateTotal(field), field)}
-              </div>
-            </div>
-          ))}
-          
-        </div>
-  <TooltipProvider>
-  <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
-    <FormateTooltip>
-      <TooltipTrigger asChild>
-        <Button
-          size="sm"
-          variant={displayFormat === "D" ? "default" : "ghost"}
-          onClick={() => setDisplayFormat("D")}
-          className={`flex-1 text-xs px-2 py-1 ${displayFormat === "D" ? "shadow-sm" : ""}`}
-        >
-          Default
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>
-        <p>Show values in default</p>
-      </TooltipContent>
-    </FormateTooltip>
-    
-    <FormateTooltip>
-      <TooltipTrigger asChild>
-        <Button
-          size="sm"
-          variant={displayFormat === "K" ? "default" : "ghost"}
-          onClick={() => setDisplayFormat("K")}
-          className={`flex-1 text-xs px-2 py-1 ${displayFormat === "K" ? "shadow-sm" : ""}`}
-        >
-          K
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>
-        <p>Show values in thousands</p>
-      </TooltipContent>
-    </FormateTooltip>
-    
-    <FormateTooltip>
-      <TooltipTrigger asChild>
-        <Button
-          size="sm"
-          variant={displayFormat === "M" ? "default" : "ghost"}
-          onClick={() => setDisplayFormat("M")}
-          className={`flex-1 text-xs px-2 py-1 ${displayFormat === "M" ? "shadow-sm" : ""}`}
-        >
-          M
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>
-        <p>Show values in millions</p>
-      </TooltipContent>
-    </FormateTooltip>
-  </div>
-</TooltipProvider>
+        <FormateTooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="sm"
+              variant={displayFormat === "K" ? "default" : "ghost"}
+              onClick={() => setDisplayFormat("K")}
+              className={`flex-1 text-xs px-2 py-1 ${displayFormat === "K" ? "shadow-sm" : ""}`}
+            >
+              K
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Show values in thousands</p>
+          </TooltipContent>
+        </FormateTooltip>
+        
+        <FormateTooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="sm"
+              variant={displayFormat === "M" ? "default" : "ghost"}
+              onClick={() => setDisplayFormat("M")}
+              className={`flex-1 text-xs px-2 py-1 ${displayFormat === "M" ? "shadow-sm" : ""}`}
+            >
+              M
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Show values in millions</p>
+          </TooltipContent>
+        </FormateTooltip>
+      </div>
+    </TooltipProvider>
+</div>
       </div>
     )}
   </CardHeader>

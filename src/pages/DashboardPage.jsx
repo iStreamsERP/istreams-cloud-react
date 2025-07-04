@@ -137,7 +137,7 @@ const DashboardPage = () => {
             <div key={index} className="space-y-6">
               {/* Header */}
               <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-bold tracking-tight">
+                <h1 className="text-xl font-bold tracking-tight">
                   {item.DASHBOARD_NAME}
                 </h1>
                <Breadcrumb>
@@ -194,8 +194,9 @@ const DashboardPage = () => {
 
                   return (
                     <Card
+                     
                       key={badgeNum}
-                      className={`hover:shadow-lg hover:scale-105 scale-100 transform transition-transform transition-all duration-300 ease-in-out ${
+                      className={`hover:shadow-lg hover:scale-105 scale-100 transform transition-transform transition-all duration-300 ease-in-out  ${
                         colors[badgeNum - 1]
                       } ${textColor} cursor-pointer`}
                       onClick={() =>
@@ -209,15 +210,15 @@ const DashboardPage = () => {
                         )
                       }
                     >
-                      <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardHeader className="flex flex-row items-center justify-between pb-1 pt-4  ">
                         <CardTitle
                           className={`text-sm font-medium ${textColor}`}
                         >
                           {item[`BADGE${badgeNum}_TITLE`] || "Unknown"}
                         </CardTitle>
                       </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl font-bold">
+                      <CardContent className="pb-3">
+                        <div className="text-xl font-bold flex items-center justify-between pt-2">
                           {showAnimatedNumbers ? (
                             <AnimatedNumber
                               value={item[`BADGE${badgeNum}_VALUE`]}
@@ -226,13 +227,14 @@ const DashboardPage = () => {
                           ) : (
                             item[`BADGE${badgeNum}_VALUE`] || "N/A"
                           )}
+                             <ArrowRight className={`h-4 w-4 ${textColor} mr-1`} />
                         </div>
-                        <div className="flex items-center justify-between pt-2">
+                        {/* <div className="flex items-center justify-between pt-2">
                           <span className={`text-xs ${textColor}`}>
                             View details
                           </span>
                           <ArrowRight className={`h-4 w-4 ${textColor} mr-1`} />
-                        </div>
+                        </div> */}
                       </CardContent>
                     </Card>
                   );

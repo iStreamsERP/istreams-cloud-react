@@ -261,7 +261,7 @@ const RecentMessage = () => {
   if (loading && groupedMessages.length === 0) {
     return (
       <>
-        <Card className="w-full h-[380px] border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 rounded-lg shadow-sm">
+        <Card className="w-[full] max-h-[60vh] border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 rounded-lg shadow-sm">
           <CardHeader className="border-b border-gray-200 dark:border-gray-800 p-4">
             <div className="flex items-center gap-2">
               <MessageSquare className="w-5 h-5 text-blue-500" />
@@ -287,7 +287,7 @@ const RecentMessage = () => {
 
   return (
     <>
-      <Card className="w-full h-[380px] border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 rounded-lg shadow-sm">
+      <Card className="w-full max-h-[60vh] border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 rounded-lg shadow-sm">
         <CardHeader className="border-b flex flex-row flex-wrap justify-between border-gray-200 dark:border-gray-800 p-2">
           <div className="flex items-center gap-2">
             <MessageSquare className="w-5 h-5 text-blue-500" />

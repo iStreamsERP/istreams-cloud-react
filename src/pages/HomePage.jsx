@@ -431,9 +431,9 @@ const HomePage = () => {
         </Card>
       </div>
 
-      <div className="grid gap-2 grid-cols-1 lg:grid-cols-2 mt-1 w-full">
+      <div className="grid gap-2 grid-cols-1  lg:grid-cols-[70%_30%] mt-1 w-full">
         {/* Tasks Table */}
-        <div className="overflow-y-scroll w-full h-[380px] shadow-lg hover:shadow-xl rounded-lg whitespace-nowrap border p-3 pb-2 border-blue-100/50 bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 transition-shadow duration-300">
+        <div className="overflow-y-scroll w-full max-h-[60vh] shadow-lg hover:shadow-xl rounded-lg whitespace-nowrap border p-3 pb-2 border-blue-100/50 bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 transition-shadow duration-300">
           <Table className="w-full whitespace-nowrap">
             <TableHeader className="w-full sticky top-0 text-sm">
               <TableRow>

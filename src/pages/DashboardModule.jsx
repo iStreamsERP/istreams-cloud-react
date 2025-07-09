@@ -85,7 +85,7 @@ const DashboardModulePage = () => {
   };
 
   return (
-    <div className="p-6">
+    <div>
       {dashboardList.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-64 rounded-lg border border-dashed">
           <FileSearch className="h-10 w-10 text-muted-foreground" />

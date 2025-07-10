@@ -45,7 +45,7 @@ export function GrossSalaryChart({ DashBoardID, ChartNo, chartTitle ,chartType: 
   const [showLegend, setShowLegend] = useState(true)
   const [legendPosition, setLegendPosition] = useState("bottom")
   const [barGap, setBarGap] = useState(4)
-  const [fontSize, setFontSize] = useState(12)
+  const [fontSize, setFontSize] = useState(11)
   const [showTooltip, setShowTooltip] = useState(true)
   const [sortOrder, setSortOrder] = useState("none") // none, asc, desc
   const [legendFontSize, setLegendFontSize] = useState(14)
@@ -580,78 +580,134 @@ const calculateTotal = (field) => {
 };
 
 
-const formatValue = (value, fieldName = '') => {
-  if (typeof value !== 'number') return value
+// const formatValue = (value, fieldName = '') => {
+//   if (typeof value !== 'number') return value
   
+//   const aggType = yAxisAggregations[fieldName] || "SUM";
+
+//   //  Skip currency symbol if aggregation is COUNT
+//   if (aggType === "COUNT") {
+//     return value.toLocaleString(); 
+//   }
+//   // Check if field name contains currency-related keywords
+//   const currencyKeywords = ['currency', 'curr', 'cost', 'value', 'amount', 'salary', 'salaries'];
+//   const fieldNameStr = String(fieldName || '');
+//   const shouldShowCurrency = currencyKeywords.some(keyword => 
+//     fieldNameStr.toLowerCase().includes(keyword.toLowerCase())
+//   );
+  
+//   // Helper function to format numbers in Indian style (lakhs/crores system)
+//   const formatIndianNumber = (num) => {
+//     const isNegative = num < 0
+//     const absNum = Math.abs(num)
+//     const numStr = absNum.toString()
+    
+//     if (numStr.length <= 3) {
+//       return (isNegative ? '-' : '') + numStr
+//     }
+    
+//     // Split into groups: first 3 digits from right, then groups of 2
+//     const firstThree = numStr.slice(-3)
+//     const remaining = numStr.slice(0, -3)
+    
+//     let formatted = firstThree
+//     let remainingStr = remaining
+    
+//     // Add commas for every 2 digits from right to left in the remaining part
+//     while (remainingStr.length > 0) {
+//       if (remainingStr.length <= 2) {
+//         formatted = remainingStr + ',' + formatted
+//         break
+//       } else {
+//         const lastTwo = remainingStr.slice(-2)
+//         formatted = lastTwo + ',' + formatted
+//         remainingStr = remainingStr.slice(0, -2)
+//       }
+//     }
+    
+//     return (isNegative ? '-' : '') + formatted
+//   }
+  
+//   // Check if currency is INR (Indian Rupee)
+//   const isINR = userData.companyCurrIsIndianStandard === false;
+//   const prefix = shouldShowCurrency ? `${currencySymbol} ` : '';
+//   switch (displayFormat) {
+//     case "K":
+//       if (isINR) {
+//         return `${prefix}${formatIndianNumber(Math.round(value / 1000))}k`;
+//       } else {
+//         return `${prefix}${(value / 1000).toFixed(userData?.companyCurrDecimals || 0)}k`;
+//       }
+//     case "M":
+//       if (isINR) {
+//         return `${prefix}${formatIndianNumber(Math.round(value / 1_000_000))}M`;
+//       } else {
+//         return `${prefix}${(value / 1_000_000).toFixed(userData?.companyCurrDecimals || 0)}M`;
+//       }
+//     default:
+//       if (isINR) {
+//         return `${prefix}${formatIndianNumber(Math.round(value))}`;
+//       } else {
+//         return `${prefix}${value.toLocaleString()}`;
+//       }
+//   }
+// }
+const formatValue = (value, fieldName = '') => {
+  if (typeof value !== 'number') return value;
+
   const aggType = yAxisAggregations[fieldName] || "SUM";
 
-  //  Skip currency symbol if aggregation is COUNT
+  // Skip formatting for COUNT aggregation
   if (aggType === "COUNT") {
     return value.toLocaleString(); 
   }
-  // Check if field name contains currency-related keywords
-  const currencyKeywords = ['currency', 'curr', 'cost', 'value', 'amount', 'salary', 'salaries'];
-  const fieldNameStr = String(fieldName || '');
-  const shouldShowCurrency = currencyKeywords.some(keyword => 
-    fieldNameStr.toLowerCase().includes(keyword.toLowerCase())
-  );
-  
+
   // Helper function to format numbers in Indian style (lakhs/crores system)
   const formatIndianNumber = (num) => {
-    const isNegative = num < 0
-    const absNum = Math.abs(num)
-    const numStr = absNum.toString()
-    
+    const isNegative = num < 0;
+    const absNum = Math.abs(num);
+    const numStr = absNum.toString();
+
     if (numStr.length <= 3) {
-      return (isNegative ? '-' : '') + numStr
+      return (isNegative ? '-' : '') + numStr;
     }
-    
-    // Split into groups: first 3 digits from right, then groups of 2
-    const firstThree = numStr.slice(-3)
-    const remaining = numStr.slice(0, -3)
-    
-    let formatted = firstThree
-    let remainingStr = remaining
-    
-    // Add commas for every 2 digits from right to left in the remaining part
+
+    const firstThree = numStr.slice(-3);
+    let remainingStr = numStr.slice(0, -3);
+    let formatted = firstThree;
+
     while (remainingStr.length > 0) {
       if (remainingStr.length <= 2) {
-        formatted = remainingStr + ',' + formatted
-        break
+        formatted = remainingStr + ',' + formatted;
+        break;
       } else {
-        const lastTwo = remainingStr.slice(-2)
-        formatted = lastTwo + ',' + formatted
-        remainingStr = remainingStr.slice(0, -2)
+        const lastTwo = remainingStr.slice(-2);
+        formatted = lastTwo + ',' + formatted;
+        remainingStr = remainingStr.slice(0, -2);
       }
     }
-    
-    return (isNegative ? '-' : '') + formatted
-  }
-  
-  // Check if currency is INR (Indian Rupee)
+
+    return (isNegative ? '-' : '') + formatted;
+  };
+
   const isINR = userData.companyCurrIsIndianStandard === false;
-  const prefix = shouldShowCurrency ? `${currencySymbol} ` : '';
+
+  // ✅ REMOVE currency symbol here
   switch (displayFormat) {
     case "K":
-      if (isINR) {
-        return `${prefix}${formatIndianNumber(Math.round(value / 1000))}k`;
-      } else {
-        return `${prefix}${(value / 1000).toFixed(userData?.companyCurrDecimals || 0)}k`;
-      }
+      return isINR
+        ? `${formatIndianNumber(Math.round(value / 1000))}k`
+        : `${(value / 1000).toFixed(userData?.companyCurrDecimals || 0)}k`;
     case "M":
-      if (isINR) {
-        return `${prefix}${formatIndianNumber(Math.round(value / 1_000_000))}M`;
-      } else {
-        return `${prefix}${(value / 1_000_000).toFixed(userData?.companyCurrDecimals || 0)}M`;
-      }
+      return isINR
+        ? `${formatIndianNumber(Math.round(value / 1_000_000))}M`
+        : `${(value / 1_000_000).toFixed(userData?.companyCurrDecimals || 0)}M`;
     default:
-      if (isINR) {
-        return `${prefix}${formatIndianNumber(Math.round(value))}`;
-      } else {
-        return `${prefix}${value.toLocaleString()}`;
-      }
+      return isINR
+        ? `${formatIndianNumber(Math.round(value))}`
+        : value.toLocaleString();
   }
-}
+};
 
 const [customColors, setCustomColors] = useState([
   "#3b82f6", "#10b981", "#f59e0b", "#ef4444", 
@@ -803,28 +859,54 @@ const handleBarClick = (data, index, event) => {
 }
 
   // Custom label function for pie/donut charts
- const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name, value, dataKey }) => {
-  if (!showPieLabels) return null
+//  const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name, value, dataKey }) => {
+//   if (!showPieLabels) return null
   
-  const RADIAN = Math.PI / 180
-  const radius = outerRadius + 30
-  const x = cx + radius * Math.cos(-midAngle * RADIAN)
-  const y = cy + radius * Math.sin(-midAngle * RADIAN)
+//   const RADIAN = Math.PI / 180
+//   const radius = outerRadius + 30
+//   const x = cx + radius * Math.cos(-midAngle * RADIAN)
+//   const y = cy + radius * Math.sin(-midAngle * RADIAN)
+  
+
+//   return (
+//     <text 
+//       x={x} 
+//       y={y} 
+//       fill="currentColor" 
+//       textAnchor={x > cx ? 'start' : 'end'} 
+//       dominantBaseline="central"
+//       fontSize={fontSize}
+//       className="fill-foreground"
+//     >
+//       {`${name}: ${formatValue(value, dataKey || name)} (${(percent * 100).toFixed(1)}%)`}
+//     </text>
+//   )
+// }
+const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name, value, dataKey }) => {
+  if (!showPieLabels) return null;
+
+  // Truncate name to 15 characters with ellipsis
+  const displayName = name.length > 10 ? name.substring(0, 10) + "..." : name;
+
+  const RADIAN = Math.PI / 180;
+  const radius = outerRadius + 30;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
   return (
-    <text 
-      x={x} 
-      y={y} 
-      fill="currentColor" 
-      textAnchor={x > cx ? 'start' : 'end'} 
+    <text
+      x={x}
+      y={y}
+      fill="currentColor"
+      textAnchor={x > cx ? 'start' : 'end'}
       dominantBaseline="central"
-      fontSize={fontSize}
+      fontSize={12}
       className="fill-foreground"
     >
-      {`${name}: ${formatValue(value, dataKey || name)} (${(percent * 100).toFixed(1)}%)`}
+      {`${displayName}: (${(percent * 100).toFixed(1)}%)`}
     </text>
-  )
-}
+  );
+};
 
   const exportChartData = () => {
     const csvContent = [
@@ -845,6 +927,29 @@ const handleBarClick = (data, index, event) => {
     a.click()
     window.URL.revokeObjectURL(url)
   }
+const formatYAxisTick = (value) => {
+  if (typeof value !== "number") return value;
+
+  const isINR = userData.companyCurrIsIndianStandard === false;
+
+  const formatIndianNumber = (num) => {
+    const isNegative = num < 0;
+    const absNum = Math.abs(num).toString();
+    const lastThree = absNum.slice(-3);
+    const other = absNum.slice(0, -3);
+    const grouped = other.replace(/\B(?=(\d{2})+(?!\d))/g, ",");
+    return (isNegative ? '-' : '') + (grouped ? grouped + ',' : '') + lastThree;
+  };
+
+  switch (displayFormat) {
+    case "K":
+      return isINR ? `${formatIndianNumber(Math.round(value / 1000))}k` : `${(value / 1000).toFixed(userData?.companyCurrDecimals || 0)}k`;
+    case "M":
+      return isINR ? `${formatIndianNumber(Math.round(value / 1000000))}M` : `${(value / 1000000).toFixed(userData?.companyCurrDecimals || 0)}M`;
+    default:
+      return isINR ? formatIndianNumber(Math.round(value)) : value.toLocaleString();
+  }
+};
 
   const renderChart = () => {
     const commonProps = {
@@ -875,8 +980,8 @@ const handleBarClick = (data, index, event) => {
           textAnchor: "end",
           height: 120,
           tickFormatter: (value) => {
-            return String(value).length > 30 
-              ? String(value).substring(0, 30) + "..." 
+            return String(value).length > 15 
+              ? String(value).substring(0, 15) + "..." 
               : String(value)
           }
         }

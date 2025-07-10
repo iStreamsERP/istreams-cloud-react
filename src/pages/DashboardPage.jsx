@@ -78,7 +78,7 @@ const DashboardPage = () => {
       <CardHeader className="p-4">
         <CardTitle className="text-xl font-bold tracking-wide">Upcoming Event</CardTitle>
       </CardHeader>
-      <CardContent className="p-3 ms-2 h-[40vh] overflow-y-auto">
+      <CardContent className="p-3 ms-2 h-[55vh] overflow-y-auto">
         {eventData.length === 0 ? (
           <div className="text-center text-lg py-8">No upcoming events.</div>
         ) : (
@@ -97,11 +97,11 @@ const DashboardPage = () => {
                   <div key={idx} className="relative">
                     <div className="absolute -left-28 top-0 text-[10px] font-semibold">{formattedDate}</div>
                     <div className="absolute -left-[22.5px] top-2 w-4 h-4 bg-blue-900 border-4 border-white rounded-full animate-pulse shadow-md" />
-                    <div className="bg-blue-100 hover:bg-blue-200 w-[280px] text-gray-800 p-2 rounded-lg shadow-lg dark:text-gray-200 dark:bg-gray-800">
+                    <div className="bg-blue-100 hover:bg-blue-200 w-full text-gray-800 p-2 rounded-lg shadow-lg dark:text-gray-200 dark:bg-gray-800">
                       <h3 className="text-lg font-semibold">{ev.EVENT_NAME}</h3>
                       <div className="font-semibold">
                         {ev.EVENT_DESCRIPTION}
-                        <p className="text-[11px] text-gray-500">{ev.EMP_NAME}</p>
+                        <p className="text-[11px] text-gray-500">{ev.EVENT_INFO}</p>
                       </div>
                     </div>
                   </div>

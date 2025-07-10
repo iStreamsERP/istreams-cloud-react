@@ -40,7 +40,7 @@ const Layout = () => {
         )}
       >
         <Header collapsed={collapsed} setCollapsed={setCollapsed} />
-        <main className="h-[calc(100vh-10vh)] overflow-y-auto overflow-x-hidden p-2">
+        <main className="h-[calc(100vh-10vh)] overflow-y-auto overflow-x-hidden p-4">
           <Outlet />
           <Toaster />
         </main>

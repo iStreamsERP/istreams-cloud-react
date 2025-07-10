@@ -116,7 +116,7 @@ const DashboardPage = () => {
 
   if (loading) {
     return (
-      <div className="p-6 space-y-6">
+      <div className="p-4 space-y-6">
         <Skeleton className="h-8 w-[200px]" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
@@ -133,109 +133,124 @@ const DashboardPage = () => {
   }
 
   return (
-    <div className=" space-y-6">
+    <div className=" ">
       {dbData.map((item, index) => (
-        <div key={index} className="space-y-6">
+        <div key={index} className="space-y-4">
           {/* Header */}
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:flex-wrap">
-            {/* Title */}
-            <h1 className="text-lg sm:text-xl font-bold text-center sm:text-left break-words">
-              {item.DASHBOARD_NAME}
-            </h1>
-
+          <div className="flex items-center justify-between">
+            <h1 className="text-xl font-bold tracking-tight">{item.DASHBOARD_NAME}</h1>
+<div className="flex gap-1 items-center"> 
             {/* Layout Buttons */}
-            <div className="flex flex-wrap items-center gap-1 text-xs justify-center sm:justify-start">
-              <span className="mr-1">Layout</span>
+            {/* <div className="flex gap-1 text-xs items-center">
+                Layout
               {[1, 2, 3, 4, 5, 6].map((num) => (
                 <button
                   key={num}
                   onClick={() => setSelectedLayout(num)}
-                  className={`px-3 py-1 rounded-md border ${selectedLayout === num
-                    ? "bg-blue-600 text-white"
-                    : "bg-white text-blue-600"
-                    }`}
+                  className={`px-3 py-1 rounded-md border ${
+                    selectedLayout === num
+                      ? "bg-blue-600 text-white"
+                      : "bg-white text-blue-600"
+                  }`}
                 >
-                  {num}
+                 {num}
                 </button>
               ))}
-            </div>
+            </div> */}
 
-            {/* Breadcrumb */}
-            <div className="flex justify-center sm:justify-end">
-              <Breadcrumb>
-                <BreadcrumbList>
-                  <BreadcrumbItem>
-                    <BreadcrumbLink href="/">Home</BreadcrumbLink>
-                  </BreadcrumbItem>
-                  <BreadcrumbSeparator />
-                  <BreadcrumbItem>
-                    <BreadcrumbLink>{item.DASHBOARD_NAME}</BreadcrumbLink>
-                  </BreadcrumbItem>
-                </BreadcrumbList>
-              </Breadcrumb>
+
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink href="/">Home</BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbLink><div className="flex items-center gap-2 text-sm">
+                  <label htmlFor="layout-select" className="font-medium text-gray-700 dark:text-gray-300">Layout:</label>
+                  <select
+                    id="layout-select"
+                    value={selectedLayout}
+                    onChange={(e) => setSelectedLayout(Number(e.target.value))}
+                    className="px-2 py-1  rounded-md  dark:bg-slate-900 text-gray-800 dark:text-white"
+                  >
+                    {[1, 2, 3, 4, 5, 6].map((num) => (
+                      <option key={num} value={num}>
+                      {num}
+                      </option>
+                    ))}
+                  </select>
+                </div></BreadcrumbLink>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
             </div>
           </div>
 
           {/* Badges (Hidden for Layout 5 amd 6) */}
-          {![5, 6].includes(selectedLayout) && (
-            <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-4 gap-4">
-              {[1, 2, 3, 4].map((badgeNum) => {
-                const colors = ["bg-blue-200", "bg-green-200", "bg-purple-200", "bg-orange-200"];
-                const textColor = "text-gray-800";
-                const generateRandomValue = () => {
-                  const badgeValue = item[`BADGE${badgeNum}_VALUE`];
-                  if (!badgeValue) return "N/A";
-                  const badgeValueStr = String(badgeValue);
-                  const prefix = badgeValueStr.replace(/[0-9]/g, "");
-                  const numbers = badgeValueStr.replace(/[^0-9]/g, "");
-                  if (numbers.length === 0) return badgeValueStr;
-                  const randomNum = Math.floor(
-                    (Math.random() * (parseInt(numbers) * 2 - parseInt(numbers))) / 2 +
-                    parseInt(numbers) / 2
-                  ).toString();
-                  return prefix + randomNum;
-                };
-                return (
-                  <Card
-                    key={badgeNum}
-                    className={`hover:shadow-lg hover:scale-105 transform transition duration-300 cursor-pointer ${colors[badgeNum - 1]} ${textColor}`}
-                    onClick={() =>
-                      navigate(`/dashboard-details/${item.DASHBOARD_ID}/${badgeNum}`, {
-                        state: { badgeTitle: item[`BADGE${badgeNum}_TITLE`] },
-                      })
-                    }
-                  >
-                    <div className="flex items-center justify-between p-4">
-                      {/* Left: Value */}
-                      <div className="text-2xl font-bold">
-                        {showAnimatedNumbers ? (
-                          <AnimatedNumber
-                            value={item[`BADGE${badgeNum}_VALUE`]}
-                            generateRandomValue={generateRandomValue}
-                          />
-                        ) : (
-                          item[`BADGE${badgeNum}_VALUE`] || "N/A"
-                        )}
-                      </div>
-
-                      {/* Right: Title + Arrow */}
-                      <div className="flex items-center text-sm font-bold">
-                        <span className="mr-1">{item[`BADGE${badgeNum}_TITLE`] || "Unknown"}</span>
-                        <ArrowRight className={`h-4 w-4 ${textColor}`} />
-                      </div>
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
+         {![5, 6].includes(selectedLayout) && (
+        <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((badgeNum) => {
+            const colors = ["bg-blue-200", "bg-green-200", "bg-purple-200", "bg-orange-200"];
+            const textColor = "text-gray-800";
+            const generateRandomValue = () => {
+              const badgeValue = item[`BADGE${badgeNum}_VALUE`];
+              if (!badgeValue) return "N/A";
+              const badgeValueStr = String(badgeValue);
+              const prefix = badgeValueStr.replace(/[0-9]/g, "");
+              const numbers = badgeValueStr.replace(/[^0-9]/g, "");
+              if (numbers.length === 0) return badgeValueStr;
+              const randomNum = Math.floor(
+                (Math.random() * (parseInt(numbers) * 2 - parseInt(numbers))) / 2 +
+                parseInt(numbers) / 2
+              ).toString();
+              return prefix + randomNum;
+            };
+            return (
+              <Card
+                key={badgeNum}
+                className={`hover:shadow-lg hover:scale-105  transform transition duration-300 cursor-pointer ${colors[badgeNum - 1]} ${textColor}`}
+                onClick={() =>
+                  navigate(`/dashboard-details/${item.DASHBOARD_ID}/${badgeNum}`, {
+                    state: { badgeTitle: item[`BADGE${badgeNum}_TITLE`] },
+                  })
+                }
+              >
+              <CardHeader className="flex flex-row items-center justify-between pb-0 pt-3">
+                        <CardTitle
+                          className={`text-sm font-medium ${textColor}`}
+                        >
+                          {item[`BADGE${badgeNum}_TITLE`] || "Unknown"}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="px-6 pb-3 pt-1">
+                       
+                        <div className="flex items-center justify-between pt-0">
+                         <div className="text-lg font-bold">
+                          {showAnimatedNumbers ? (
+                            <AnimatedNumber
+                              value={item[`BADGE${badgeNum}_VALUE`]}
+                              generateRandomValue={generateRandomValue}
+                            />
+                          ) : (
+                            item[`BADGE${badgeNum}_VALUE`] || "N/A"
+                          )}
+                        </div>
+                          <ArrowRight className={`h-4 w-4 ${textColor} mr-1`} />
+                        </div>
+                      </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+)}
 
 
           {/* Layout 1 */}
           {selectedLayout === 1 && (
             <>
               <GrossSalaryChart {...chartProps(item, 1)} />
-              <div className="grid sm:grid-cols-2 gap-3">
+              <div className="grid lg:grid-cols-2 gap-3">
                 <GrossSalaryChart {...chartProps(item, 2)} />
                 {renderEventCard()}
               </div>
@@ -285,11 +300,8 @@ const DashboardPage = () => {
           {selectedLayout === 5 && (
             <>
               <div className="grid lg:grid-cols-2 gap-4">
-                {/* Left side - Chart */}
                 <GrossSalaryChart {...chartProps(item, 1)} />
-
-                {/* Right side - 2x2 grid of cards with minimum height */}
-                <div className="grid grid-cols-2 gap-4 h-[100px] mb-10"> {/* Adjust 400px to your preferred minimum height */}
+                <div className="space-y-4">
                   {[1, 2, 3, 4].map((badgeNum) => {
                     const colors = ["bg-blue-200", "bg-green-200", "bg-purple-200", "bg-orange-200"];
                     const textColor = "text-gray-800";
@@ -309,11 +321,20 @@ const DashboardPage = () => {
                     return (
                       <Card
                         key={badgeNum}
-                        className={`h-full hover:shadow-lg hover:scale-105 transform transition duration-300 cursor-pointer ${colors[badgeNum - 1]} ${textColor}`}
+                        className={`hover:shadow-lg hover:scale-105 transform transition duration-300 cursor-pointer ${colors[badgeNum - 1]} ${textColor} p-4`}
+                        onClick={() =>
+                          navigate(`/dashboard-details/${item.DASHBOARD_ID}/${badgeNum}`, {
+                            state: { badgeTitle: item[`BADGE${badgeNum}_TITLE`] },
+                          })
+                        }
                       >
-                        <div className="flex items-center justify-between p-4 h-full"> {/* Added h-full here */}
-                          {/* Left: Value */}
-                          <div className="text-2xl font-bold">
+                        <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4">
+                          <CardTitle className={`text-xl font-medium ${textColor}`}>
+                            {item[`BADGE${badgeNum}_TITLE`] || "Unknown"}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pb-3">
+                          <div className="text-xl font-bold flex items-center justify-between pt-2">
                             {showAnimatedNumbers ? (
                               <AnimatedNumber
                                 value={item[`BADGE${badgeNum}_VALUE`]}
@@ -322,14 +343,9 @@ const DashboardPage = () => {
                             ) : (
                               item[`BADGE${badgeNum}_VALUE`] || "N/A"
                             )}
+                            <ArrowRight className={`h-4 w-4 ${textColor} mr-1`} />
                           </div>
-
-                          {/* Right: Title + Arrow */}
-                          <div className="flex items-center text-sm font-bold">
-                            <span className="mr-1">{item[`BADGE${badgeNum}_TITLE`] || "Unknown"}</span>
-                            <ArrowRight className={`h-4 w-4 ${textColor}`} />
-                          </div>
-                        </div>
+                        </CardContent>
                       </Card>
                     );
                   })}
@@ -342,13 +358,13 @@ const DashboardPage = () => {
               <GrossSalaryChart {...chartProps(item, 3)} />
             </>
           )}
-
-          {/* Layout 6 */}
+          
+            {/* Layout 6 */}
           {selectedLayout === 6 && (
             <>
               <div className="grid lg:grid-cols-2 gap-4">
-                {/* Left side - Chart */}
-                <div className="grid grid-cols-2 gap-4 h-[100px] mb-10"> {/* Adjust 400px to your preferred minimum height */}
+                {/* Left: Badges in column */}
+                <div className="space-y-4">
                   {[1, 2, 3, 4].map((badgeNum) => {
                     const colors = ["bg-blue-200", "bg-green-200", "bg-purple-200", "bg-orange-200"];
                     const textColor = "text-gray-800";
@@ -368,11 +384,20 @@ const DashboardPage = () => {
                     return (
                       <Card
                         key={badgeNum}
-                        className={`h-full hover:shadow-lg hover:scale-105 transform transition duration-300 cursor-pointer ${colors[badgeNum - 1]} ${textColor}`}
+                        className={`hover:shadow-lg hover:scale-105 transform transition duration-300 cursor-pointer ${colors[badgeNum - 1]} ${textColor}`}
+                        onClick={() =>
+                          navigate(`/dashboard-details/${item.DASHBOARD_ID}/${badgeNum}`, {
+                            state: { badgeTitle: item[`BADGE${badgeNum}_TITLE`] },
+                          })
+                        }
                       >
-                        <div className="flex items-center justify-between p-4 h-full"> {/* Added h-full here */}
-                          {/* Left: Value */}
-                          <div className="text-2xl font-bold">
+                        <CardHeader className="flex flex-row items-center justify-between pb-1 pt-4">
+                          <CardTitle className={`text-sm font-medium ${textColor}`}>
+                            {item[`BADGE${badgeNum}_TITLE`] || "Unknown"}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pb-3">
+                          <div className="text-xl font-bold flex items-center justify-between pt-2">
                             {showAnimatedNumbers ? (
                               <AnimatedNumber
                                 value={item[`BADGE${badgeNum}_VALUE`]}
@@ -381,21 +406,18 @@ const DashboardPage = () => {
                             ) : (
                               item[`BADGE${badgeNum}_VALUE`] || "N/A"
                             )}
+                            <ArrowRight className={`h-4 w-4 ${textColor} mr-1`} />
                           </div>
-
-                          {/* Right: Title + Arrow */}
-                          <div className="flex items-center text-sm font-bold">
-                            <span className="mr-1">{item[`BADGE${badgeNum}_TITLE`] || "Unknown"}</span>
-                            <ArrowRight className={`h-4 w-4 ${textColor}`} />
-                          </div>
-                        </div>
+                        </CardContent>
                       </Card>
                     );
                   })}
                 </div>
 
-                {/* Right side - 2x2 grid of cards with minimum height */}
-                <GrossSalaryChart {...chartProps(item, 1)} />
+                {/* Right: Event card full height */}
+                <div className="h-full">
+                  {renderEventCard()}
+                </div>
               </div>
 
               {/* Below section can be extended if needed */}
@@ -407,7 +429,7 @@ const DashboardPage = () => {
             </>
           )}
 
-
+          
         </div>
       ))}
     </div>

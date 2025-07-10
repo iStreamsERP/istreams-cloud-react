@@ -12,13 +12,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
-import { ChevronDown, X, BarChart3, TrendingUp, Settings, Palette, Eye, Download, Activity, AreaChart as AreaChartIcon, BarChart4, PieChart as PieChartIcon } from "lucide-react"
+import { ChevronDown, X, BarChart3, TrendingUp, Settings, Palette, Eye, Download, Activity, AreaChart as AreaChartIcon, BarChart4, PieChart as PieChartIcon,MessageCircle ,Sparkles,Zap,Brain,Cpu, ChevronUp,Table} from "lucide-react"
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { toPng } from 'html-to-image';
 import jsPDF from 'jspdf';
 import html2canvas from "html2canvas"
 import { callSoapService } from "@/api/callSoapService"
 import { useNavigate } from "react-router-dom"
+import ChatbotUI from "../ChatbotUI"
+
 export function GrossSalaryChart({ DashBoardID, ChartNo, chartTitle ,chartType: initialChartType = "bar", chartXAxis, chartYAxis }) {
   const { userData } = useAuth()
   const [tasks, setTasks] = useState([])
@@ -27,7 +29,8 @@ export function GrossSalaryChart({ DashBoardID, ChartNo, chartTitle ,chartType: 
   const [selectedYAxes, setSelectedYAxes] = useState([])
   const [textFields, setTextFields] = useState([])
   const [numericFields, setNumericFields] = useState([])
-  
+  const [yAxisAggregations, setYAxisAggregations] = useState({});
+
   // Chart type selection - Added pie and donut
   const [chartType, setChartType] = useState(initialChartType) // bar, horizontalBar, line, area, pie, donut
   const [dbData, setDbData] = useState([])
@@ -47,7 +50,7 @@ export function GrossSalaryChart({ DashBoardID, ChartNo, chartTitle ,chartType: 
   const [legendFontSize, setLegendFontSize] = useState(14)
   const [maxBarsToShow, setMaxBarsToShow] = useState(50)
   const [customTitle, setCustomTitle] = useState(chartTitle)
-  const [yAxisAggregations, setYAxisAggregations] = useState({})  
+
   // Line/Area chart specific options
   const [strokeWidth, setStrokeWidth] = useState(2)
   const [showDots, setShowDots] = useState(true)
@@ -69,8 +72,29 @@ export function GrossSalaryChart({ DashBoardID, ChartNo, chartTitle ,chartType: 
   const [availableCategories, setAvailableCategories] = useState({}) // Object to store unique values per field
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
+  const [isTableDialogOpen, setIsTableDialogOpen] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+
   const navigate = useNavigate()
   const currencySymbol = userData?.companyCurrSymbol || "$"
+const handlePreviewClick = () => {
+  const chartData = {
+    DashBoardID,
+    ChartNo,
+    chartTitle: customTitle || chartTitle,
+    chartXAxis,
+    chartYAxis,
+    
+
+  };
+
+  // Store in sessionStorage
+  sessionStorage.setItem("chartPreviewData", JSON.stringify(chartData));
+
+  // Open new tab
+  window.open("/chart-preview", "_blank");
+};
+
 
   const formatFieldName = (fieldName) => {
     return fieldName
@@ -255,157 +279,121 @@ const getEffectiveChartType = () => {
 }
 
 useEffect(() => {
-  if (DashBoardID && ChartNo && (selectedXAxes.length > 0 && selectedYAxes.length > 0)) {
-    console.log("Triggering data refetch due to axis or aggregation change");
-    console.log("Current Y-Axis Aggregations:", yAxisAggregations);
-    
-    // Add a small delay to ensure aggregation state is properly set
-    const timeoutId = setTimeout(() => {
-      fetchChartData();
-    }, 100);
-    
-    return () => clearTimeout(timeoutId);
+  // Re-fetch data when X or Y axes selections change
+  if (DashBoardID && ChartNo && (selectedXAxes.length > 0 || selectedYAxes.length > 0)) {
+    fetchChartData()
   }
-}, [selectedXAxes, selectedYAxes, yAxisAggregations, DashBoardID, ChartNo]);
-useEffect(() => {
-  if (DashBoardID && ChartNo && (selectedXAxes.length > 0 && selectedYAxes.length > 0)) {
-    console.log("Triggering data refetch due to axis or aggregation change");
-    console.log("Current Y-Axis Aggregations:", yAxisAggregations);
-    
-    // Add a small delay to ensure aggregation state is properly set
-    const timeoutId = setTimeout(() => {
-      fetchChartData();
-    }, 100);
-    
-    return () => clearTimeout(timeoutId);
-  }
-}, [selectedXAxes, selectedYAxes, yAxisAggregations, DashBoardID, ChartNo]);
+}, [selectedXAxes, selectedYAxes])
+
 const fetchChartData = async () => {
   try {
     const chartID = { DashBoardID, ChartNo };
     const res = await callSoapService(userData.clientURL, "BI_GetDashboard_Chart_Data", chartID);
-    
     console.log("Fetched chart data:", res);
-    
-    if (res.length > 0) {
-      const sampleData = res[0];
-      const allFields = Object.keys(sampleData);
-               
-      const textFieldsList = [];
-      const numericFieldsList = [];
-               
-      allFields.forEach(field => {
-        if (isNumericField(field, sampleData)) {
-          numericFieldsList.push(field);
+
+    // Check if res is a valid array
+    if (!Array.isArray(res) || res.length === 0) {
+      console.warn("No data returned or invalid format from BI_GetDashboard_Chart_Data");
+      setTasks([]);
+      return;
+    }
+
+    const sampleData = res[0];
+    const allFields = Object.keys(sampleData);
+
+    const textFieldsList = [];
+    const numericFieldsList = [];
+
+    allFields.forEach(field => {
+      if (isNumericField(field, sampleData)) {
+        numericFieldsList.push(field);
+      } else {
+        textFieldsList.push(field);
+      }
+    });
+
+    setTextFields(textFieldsList);
+    setNumericFields(numericFieldsList);
+
+    // Process X and Y axes
+    const processedChartXAxis = chartXAxis?.includes(":")
+      ? chartXAxis.split(":")[1].trim()
+      : chartXAxis;
+
+    const processedChartYAxis = chartYAxis?.includes(":")
+      ? chartYAxis.split(":")[1].trim()
+      : chartYAxis;
+
+    let finalXAxes = [...selectedXAxes];
+    if (finalXAxes.length === 0) {
+      if (processedChartXAxis && textFieldsList.includes(processedChartXAxis)) {
+        finalXAxes = [processedChartXAxis];
+      } else if (textFieldsList.length > 0) {
+        finalXAxes = [textFieldsList[0]];
+      }
+      setSelectedXAxes(finalXAxes);
+    }
+
+    let finalYAxes = [...selectedYAxes];
+    if (finalYAxes.length === 0) {
+      if (processedChartYAxis && numericFieldsList.includes(processedChartYAxis)) {
+        finalYAxes = [processedChartYAxis];
+      } else if (numericFieldsList.length > 0) {
+        finalYAxes = [numericFieldsList[0]];
+      }
+      setSelectedYAxes(finalYAxes);
+    }
+
+    // If axes are ready, call grouping service
+    if (finalXAxes.length > 0 && finalYAxes.length > 0) {
+      const rawJsonString = JSON.stringify(res);
+      const escapedJson = rawJsonString
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+
+      const groupColumns = finalXAxes.join(",");
+      const summaryColumns = finalYAxes
+        .map(col => {
+          const agg = yAxisAggregations[col] || "SUM";
+          return `${agg}:${col}`;
+        })
+        .join(",");
+
+      const groupingPayload = {
+        inputJSONData: escapedJson,
+        FilterCondition: "",
+        groupColumns,
+        summaryColumns,
+      };
+
+      console.log("Sending to Data_Group_JSONValues:", groupingPayload);
+
+      try {
+        const groupedData = await callSoapService(userData.clientURL, "Data_Group_JSONValues", groupingPayload);
+        console.log("Grouped chart data:", groupedData);
+
+        if (Array.isArray(groupedData)) {
+          setTasks(groupedData);
         } else {
-          textFieldsList.push(field);
-        }
-      });
-               
-      setTextFields(textFieldsList);
-      setNumericFields(numericFieldsList);
-      
-      // Set default axes if not already selected
-      if (selectedXAxes.length === 0) {
-        const processedChartXAxis = chartXAxis && chartXAxis.includes(':') 
-          ? chartXAxis.split(':')[1].trim() 
-          : chartXAxis;
-          
-        if (processedChartXAxis && textFieldsList.includes(processedChartXAxis)) {
-          setSelectedXAxes([processedChartXAxis]);
-        } else if (textFieldsList.length > 0) {
-          setSelectedXAxes([textFieldsList[0]]);
-        }
-      }
-
-      if (selectedYAxes.length === 0) {
-        const processedChartYAxis = chartYAxis && chartYAxis.includes(':') 
-          ? chartYAxis.split(':')[1].trim() 
-          : chartYAxis;
-          
-        if (processedChartYAxis && numericFieldsList.includes(processedChartYAxis)) {
-          setSelectedYAxes([processedChartYAxis]);
-          // Set default aggregation to SUM for the initial field
-          setYAxisAggregations(prev => ({
-            ...prev,
-            [processedChartYAxis]: 'SUM'
-          }));
-        } else if (numericFieldsList.length > 0) {
-          setSelectedYAxes([numericFieldsList[0]]);
-          // Set default aggregation to SUM for the first numeric field
-          setYAxisAggregations(prev => ({
-            ...prev,
-            [numericFieldsList[0]]: 'SUM'
-          }));
-        }
-      }
-      
-      // ✅ ALWAYS call grouping API when we have axes selected (including aggregation changes)
-      if (selectedXAxes.length > 0 && selectedYAxes.length > 0) {
-        
-        const inputJSONData = JSON.stringify(res);
-        const groupColumns = selectedXAxes.join(",");
-
-        // ✅ ENHANCED: Ensure all selected Y-axis fields have aggregation types
-        const validatedAggregations = { ...yAxisAggregations };
-        selectedYAxes.forEach(field => {
-          if (!validatedAggregations[field]) {
-            validatedAggregations[field] = 'SUM'; // Default to SUM
-          }
-        });
-        
-        // Update state if any defaults were added
-        if (JSON.stringify(validatedAggregations) !== JSON.stringify(yAxisAggregations)) {
-          setYAxisAggregations(validatedAggregations);
-        }
-        
-        // Build summaryColumns with proper aggregation types
-        const summaryColumns = selectedYAxes.map(col => {
-          const aggregationType = validatedAggregations[col] || 'SUM';
-          console.log(`Field: ${col}, Aggregation: ${aggregationType}`);
-          return `${aggregationType}:${col}`;
-        }).join(",");
-        
-        const jsonDataID = {
-          inputJSONData: inputJSONData,
-          FilterCondition: "",
-          groupColumns: groupColumns,
-          summaryColumns: summaryColumns
-        };
-        
-        console.log("Summary Columns (formatted):", summaryColumns);
-  
-        
-        try {
-          const groupedData = await callSoapService(userData.clientURL, "Data_Group_JSONValues", jsonDataID);
-          console.log("Grouped chart data received:", groupedData);
-          
-          if (groupedData && Array.isArray(groupedData) && groupedData.length > 0) {
-            // ✅ Force state update with new data
-            setTasks([...groupedData]); // Use spread to ensure new reference
-            console.log("Successfully updated chart data with new aggregations");
-          } else {
-            console.warn("API returned empty or invalid grouped data:", groupedData);
-            setTasks([]);
-          }
-        } catch (apiError) {
-          console.error("Grouping API call failed:", apiError);
-          // Fallback to original data if grouping fails
+          console.warn("Grouped data is not an array. Falling back to raw data.");
           setTasks(res);
         }
-      } else {
-        console.log("Using original data (axes not properly selected)");
-        setTasks(res);
+      } catch (groupingError) {
+        console.error("Grouping API failed:", groupingError);
+        setTasks(res); // Fallback to raw data
       }
     } else {
-      console.log("No data returned from initial API call");
-      setTasks([]);
+      console.warn("X or Y axis not selected properly. Showing raw data.");
+      setTasks(res);
     }
   } catch (error) {
-    console.error("Failed to fetch chart data:", error);
+    console.error("Failed to fetch chart data", error);
     setTasks([]);
   }
 };
+
+
 
   const handleXAxisChange = (field, checked) => {
     if (checked) {
@@ -415,82 +403,32 @@ const fetchChartData = async () => {
     }
   }
 
-const handleAggregationChange = (field, aggregationType) => {
-  console.log(`Setting aggregation for ${field}: ${aggregationType}`);
-  
-  setYAxisAggregations(prev => {
-    const newAggregations = {
-      ...prev,
-      [field]: aggregationType
-    };
-    console.log("Updated aggregations:", newAggregations);
-    return newAggregations;
-  });
-};
+  const handleYAxisChange = (field, checked) => {
+    if (checked) {
+      setSelectedYAxes([...selectedYAxes, field])
+    } else {
+      setSelectedYAxes(selectedYAxes.filter(f => f !== field))
+    }
+  }
+  useEffect(() => {
+  if (DashBoardID && ChartNo && selectedYAxes.length > 0) {
+    fetchChartData();
+  }
+}, [yAxisAggregations]);
 
-// 4. Add a useEffect to force chart re-render when tasks data changes
-useEffect(() => {
-  console.log("Chart data updated, tasks length:", tasks.length);
-  if (tasks.length > 0) {
-    console.log("Sample task data:", tasks[0]);
-  }
-}, [tasks]);
-
-// 2. Update the handleYAxisChange function to set default SUM aggregation
-const handleYAxisChange = (field, checked) => {
-  if (checked) {
-    setSelectedYAxes(prev => [...prev, field]);
-    // Set default aggregation to SUM for new fields
-    setYAxisAggregations(prev => ({
-      ...prev,
-      [field]: 'SUM' // Default to SUM
-    }));
-  } else {
-    setSelectedYAxes(prev => prev.filter(f => f !== field));
-    // Remove aggregation setting for removed fields
-    setYAxisAggregations(prev => {
-      const newAgg = { ...prev };
-      delete newAgg[field];
-      return newAgg;
-    });
-  }
-};
-useEffect(() => {
-  if (selectedYAxes.length > 0) {
-    validateAggregations();
-  }
-}, [selectedYAxes]);
-const validateAggregations = () => {
-  const missingAggregations = selectedYAxes.filter(field => !yAxisAggregations[field]);
-  
-  if (missingAggregations.length > 0) {
-    console.warn("Missing aggregations for fields:", missingAggregations);
-    // Set default SUM for missing aggregations
-    const defaultAggregations = {};
-    missingAggregations.forEach(field => {
-      defaultAggregations[field] = 'SUM'; // Always default to SUM
-    });
-    
-    setYAxisAggregations(prev => ({
-      ...prev,
-      ...defaultAggregations
-    }));
-  }
+const handleAggregationChange = (field, aggType) => {
+  setYAxisAggregations(prev => ({
+    ...prev,
+    [field]: aggType
+  }));
 };
   const removeXAxisField = (field) => {
     setSelectedXAxes(selectedXAxes.filter(f => f !== field))
   }
 
- const removeYAxisField = (field) => {
-  setSelectedYAxes(selectedYAxes.filter(f => f !== field))
-  // Remove aggregation setting for removed field
-  setYAxisAggregations(prev => {
-    const newAgg = { ...prev }
-    delete newAgg[field]
-    return newAgg
-  })
-}
-
+  const removeYAxisField = (field) => {
+    setSelectedYAxes(selectedYAxes.filter(f => f !== field))
+  }
 
   useEffect(() => {
   if (tasks.length > 0 && selectedXAxes.length > 0) {
@@ -550,11 +488,6 @@ const deselectAllCategories = (field) => {
     [field]: []
   }))
 }
-
-useEffect(() => {
-  // Force component to re-render when aggregations change
-  console.log("Aggregations changed, chart should update:", yAxisAggregations);
-}, [yAxisAggregations]);
 
 const processChartData = () => {
   if (selectedXAxes.length === 0 || selectedYAxes.length === 0) return []
@@ -629,39 +562,30 @@ const processChartData = () => {
 const chartData = processChartData()
 
 const calculateTotal = (field) => {
-  const aggregationType = yAxisAggregations[field] || 'SUM';
-  
-  if (aggregationType === 'COUNT') {
-    // For COUNT, return the number of data points
-    return chartData.length;
-  } else if (aggregationType === 'AVG' && chartData.length > 0) {
-    // For AVG, calculate the average of the field values
-    const total = chartData.reduce((sum, item) => sum + (item[field] || 0), 0);
-    return total / chartData.length;
-  } else {
-    // For SUM or default, sum all values
-    return chartData.reduce((sum, item) => sum + (item[field] || 0), 0);
+  const agg = yAxisAggregations[field] || "SUM";
+  const values = chartData.map(item => parseFloat(item[field]) || 0).filter(v => !isNaN(v));
+
+  switch (agg) {
+    case "AVG":
+      return values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+    case "COUNT":
+      return values.length;
+    case "SUM":
+    default:
+      return values.reduce((a, b) => a + b, 0);
   }
 };
-
-// 6. Add a useEffect to force chart re-render when aggregations change
-useEffect(() => {
-  // Force component to re-render when aggregations change
-  console.log("Aggregations changed, chart should update:", yAxisAggregations);
-}, [yAxisAggregations]);
-
-// 7. Enhanced format value function to show aggregation context
-const formatValueWithAggregation = (value, fieldName, aggregationType) => {
-  const formattedValue = formatValue(value, fieldName);
-  return `${formattedValue}`;
-};
-
-
 
 
 const formatValue = (value, fieldName = '') => {
   if (typeof value !== 'number') return value
   
+  const aggType = yAxisAggregations[fieldName] || "SUM";
+
+  //  Skip currency symbol if aggregation is COUNT
+  if (aggType === "COUNT") {
+    return value.toLocaleString(); 
+  }
   // Check if field name contains currency-related keywords
   const currencyKeywords = ['currency', 'curr', 'cost', 'value', 'amount', 'salary', 'salaries'];
   const fieldNameStr = String(fieldName || '');
@@ -922,9 +846,12 @@ const handleBarClick = (data, index, event) => {
   const renderChart = () => {
     const commonProps = {
       data: chartData,
-      margin: chartType === "horizontalBar" 
-        ? { top: 20, right: 30, left: 100, bottom: 20 }
-        : { top: 20, right: 30, left: 20, bottom: 100 }
+      margin: {
+        top: 20,
+        right: 30,
+        left: chartType === "horizontalBar" ? 100 : 20,
+        bottom: chartType === "pie" || chartType === "donut" ? 10 : 10 // Reduced bottom margin
+      }
     }
 
     const xAxisProps = chartType === "horizontalBar" 
@@ -983,10 +910,7 @@ const handleBarClick = (data, index, event) => {
             
             {selectedYAxes.length > 1 && showLegend && (
               <Legend 
-                formatter={(value) => {
-                  const aggregationType = yAxisAggregations[value] || 'SUM';
-                  return `${aggregationType} of ${formatFieldName(value)}`;
-                }}
+                formatter={(value) => formatFieldName(value)}
                 wrapperStyle={{ paddingTop: "20px", fontSize: `${legendFontSize}px` }}
                 layout={legendPosition === "left" || legendPosition === "right" ? "vertical" : "horizontal"}
                 align={legendPosition === "left" ? "left" : legendPosition === "right" ? "right" : "center"}
@@ -995,27 +919,26 @@ const handleBarClick = (data, index, event) => {
             )}
 
             {selectedYAxes.map((field, index) => (
-  <Bar 
-    key={`${field}-${yAxisAggregations[field] || 'SUM'}-${index}`} // ✅ Enhanced key with index
-    dataKey={field} 
-    fill={getFieldColor(index)}
-    radius={barRadius}
-    name={`${yAxisAggregations[field] || 'SUM'} of ${formatFieldName(field)}`}
-    onClick={handleBarClick}
-    style={{ cursor: 'pointer' }}
-  >
-    {showDataLabels && (
-      <LabelList
-        key={`labels-${field}-${yAxisAggregations[field] || 'SUM'}-${index}`} // ✅ Enhanced key
-        dataKey={field}
-        position={getDataLabelPosition()}
-        formatter={(value) => formatValue(value, field)}
-        className="fill-foreground"
-        fontSize={fontSize - 2}
-      />
-    )}
-  </Bar>
-))}
+              <Bar 
+                key={field}
+                dataKey={field} 
+                fill={getFieldColor(index)}
+                radius={barRadius}
+                name={formatFieldName(field)}
+                onClick={handleBarClick}
+                style={{ cursor: 'pointer' }}
+              >
+                {showDataLabels && (
+                  <LabelList
+                    dataKey={field}
+                    position={getDataLabelPosition()}
+                    formatter={(value) => formatValue(value, field)}
+                    className="fill-foreground"
+                    fontSize={fontSize - 2}
+                  />
+                )}
+              </Bar>
+            ))}
           </BarChart>
         )
        // Replace the horizontalBar case in your renderChart() function with this fixed version:
@@ -1053,10 +976,7 @@ case "horizontalBar":
       
       {selectedYAxes.length > 1 && showLegend && (
         <Legend 
-         formatter={(value) => {
-  const aggregationType = yAxisAggregations[value] || 'SUM';
-  return `${aggregationType} of ${formatFieldName(value)}`;
-}}
+          formatter={(value) => formatFieldName(value)}
           wrapperStyle={{ paddingTop: "20px", fontSize: `${legendFontSize}px` }}
           layout={legendPosition === "left" || legendPosition === "right" ? "vertical" : "horizontal"}
           align={legendPosition === "left" ? "left" : legendPosition === "right" ? "right" : "center"}
@@ -1070,7 +990,7 @@ case "horizontalBar":
           dataKey={field} 
           fill={getFieldColor(index)}
           radius={[0, barRadius, barRadius, 0]} // Horizontal bar radius
-         name={`${yAxisAggregations[field] || 'SUM'} of ${formatFieldName(field)}`}
+          name={formatFieldName(field)}
           onClick={handleBarClick}
           style={{ cursor: 'pointer' }}
         >
@@ -1123,10 +1043,7 @@ case "horizontalStackedBar":
       
       {/* Always show legend for stacked charts */}
       <Legend 
-       formatter={(value) => {
-  const aggregationType = yAxisAggregations[value] || 'SUM';
-  return `${aggregationType} of ${formatFieldName(value)}`;
-}}
+        formatter={(value) => formatFieldName(value)}
         wrapperStyle={{ paddingTop: "20px" , fontSize: `${legendFontSize}px`}}
         layout={legendPosition === "left" || legendPosition === "right" ? "vertical" : "horizontal"}
         align={legendPosition === "left" ? "left" : legendPosition === "right" ? "right" : "center"}
@@ -1140,7 +1057,7 @@ case "horizontalStackedBar":
           stackId="horizontalStack"
           fill={getFieldColor(index)}
           radius={index === selectedYAxes.length - 1 ? [0, barRadius, barRadius, 0] : [0, 0, 0, 0]}
-         name={`${yAxisAggregations[field] || 'SUM'} of ${formatFieldName(field)}`}
+          name={formatFieldName(field)}
           onClick={handleBarClick}
           style={{ cursor: 'pointer' }}
         >
@@ -1166,10 +1083,7 @@ case "horizontalStackedBar":
             
             {selectedYAxes.length > 1 && showLegend && (
               <Legend 
-               formatter={(value) => {
-  const aggregationType = yAxisAggregations[value] || 'SUM';
-  return `${aggregationType} of ${formatFieldName(value)}`;
-}}
+                formatter={(value) => formatFieldName(value)}
                 wrapperStyle={{ paddingTop: "20px", fontSize: `${legendFontSize}px` }}
               />
             )}
@@ -1182,7 +1096,7 @@ case "horizontalStackedBar":
                 stroke={getFieldColor(index)}
                 strokeWidth={strokeWidth}
                 dot={showDots ? { r: 4 } : false}
-               name={`${yAxisAggregations[field] || 'SUM'} of ${formatFieldName(field)}`}
+                name={formatFieldName(field)}
                 onClick={handleBarClick}
                 style={{ cursor: 'pointer' }}
               />
@@ -1199,10 +1113,7 @@ case "horizontalStackedBar":
             
             {selectedYAxes.length > 1 && showLegend && (
               <Legend 
-               formatter={(value) => {
-  const aggregationType = yAxisAggregations[value] || 'SUM';
-  return `${aggregationType} of ${formatFieldName(value)}`;
-}}
+                formatter={(value) => formatFieldName(value)}
                 wrapperStyle={{ paddingTop: "20px", fontSize: `${legendFontSize}px` }}
               />
             )}
@@ -1216,7 +1127,7 @@ case "horizontalStackedBar":
                 fill={getFieldColor(index)}
                 fillOpacity={fillOpacity}
                 strokeWidth={strokeWidth}
-               name={`${yAxisAggregations[field] || 'SUM'} of ${formatFieldName(field)}`}
+                name={formatFieldName(field)}
                 onClick={handleBarClick}
                 style={{ cursor: 'pointer' }}
               />
@@ -1233,10 +1144,7 @@ case "stackedBar":
       
       {/* Always show legend for stacked charts */}
       <Legend 
-       formatter={(value) => {
-  const aggregationType = yAxisAggregations[value] || 'SUM';
-  return `${aggregationType} of ${formatFieldName(value)}`;
-}}
+        formatter={(value) => formatFieldName(value)}
         wrapperStyle={{ paddingTop: "20px", fontSize: `${legendFontSize}px` }}
         layout={legendPosition === "left" || legendPosition === "right" ? "vertical" : "horizontal"}
         align={legendPosition === "left" ? "left" : legendPosition === "right" ? "right" : "center"}
@@ -1250,7 +1158,7 @@ case "stackedBar":
           stackId="stack1" // This creates the stacking effect
           fill={getFieldColor(index)}
           radius={index === selectedYAxes.length - 1 ? [barRadius, barRadius, 0, 0] : [0, 0, 0, 0]} // Only round top bar
-         name={`${yAxisAggregations[field] || 'SUM'} of ${formatFieldName(field)}`}
+          name={formatFieldName(field)}
           onClick={handleBarClick}
           style={{ cursor: 'pointer' }}
         >
@@ -1335,11 +1243,7 @@ case "stackedDonut":
       {showTooltip && <Tooltip content={<CustomTooltip />} />}
       {showLegend && (
         <Legend
-         formatter={(value) => {
-            // Show aggregation type in legend for stacked charts
-            const aggregationType = yAxisAggregations[value] || 'SUM'
-            return `${aggregationType} of ${formatFieldName(value)}`
-          }}
+          formatter={(value) => formatFieldName(value)}
           layout={legendPosition === "left" || legendPosition === "right" ? "vertical" : "horizontal"}
           align={legendPosition === "left" ? "left" : legendPosition === "right" ? "right" : "center"}
           verticalAlign={legendPosition === "top" ? "top" : "bottom"}
@@ -1926,784 +1830,902 @@ case "stackedDonut":
  
 
 return (
-<Card className="w-full bg-white dark:bg-slate-950 border shadow-sm">
-  <CardHeader className="p-2 sm:p-4">
+  <div className="flex flex-col gap-1">
+     <Card className="w-full bg-white dark:bg-slate-950 border shadow-sm">
+        <CardHeader className="p-2 sm:px-4 sm:py-1">
     {/* Top row: Title and Controls */}
-  <div className="flex flex-wrap gap-4 items-center justify-between">
-      {/* Title and Display Format */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center min-w-0 flex-shrink">
-        <h3 className="text-lg sm:text-xl font-bold truncate flex flex-col gap-1 ">     
-          {chartTitle}
-          <span className="text-sm">CurrencyType:{userData.companyCurrName}</span>
-        </h3>
+<div className="flex flex-wrap gap-2 items-center justify-between">
+  {/* Title Section */}
+  <div className="flex gap-2">
+    <div className="flex flex-col gap-1 sm:flex-row sm:items-center min-w-0 flex-shrink">
+      <h3 className="text-sm sm:text-md font-bold truncate flex flex-col gap-1">
+        {chartTitle}
+        <span className="text-sm font-semibold">in {userData.companyCurrName}</span>
+      </h3>
+    </div>
+  </div>
+
+  {/* Dropdown Toggle Button */}
+  <div className="flex flex-row gap-2">
+     
+  {/* Action Buttons */}
+          <div className="flex z-50 gap-2">
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="flex-1 sm:flex-none z-50 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900 dark:to-blue-900 border-purple-200 dark:border-purple-700 hover:shadow-lg transition-all duration-200"
+                >
+                  <Settings className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                </Button>
+              </DialogTrigger>
+               <DialogContent className="max-w-4xl max-h-[90vh] z-50 overflow-y-auto">
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h4 className="font-semibold text-lg bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">Chart Customization</h4>
+            <p className="text-sm text-muted-foreground">Fine-tune your chart appearance and behavior</p>
+          </div>
+          
+          {/* Export Button */}
+         
+        </div>
        
+                 {/* Basic Settings Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Color Scheme */}
+          <div className="space-y-2">
+  <Label className="text-sm font-medium">Color Scheme:</Label>
+  <Select value={colorScheme} onValueChange={setColorScheme}>
+    <SelectTrigger>
+      <SelectValue />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="default">Default</SelectItem>
+      <SelectItem value="ocean">Ocean</SelectItem>
+      <SelectItem value="forest">Forest</SelectItem>
+      <SelectItem value="sunset">Sunset</SelectItem>
+      <SelectItem value="purple">Purple</SelectItem>
+      <SelectItem value="monochrome">Monochrome</SelectItem>
+      <SelectItem value="custom">
+        <div className="flex items-center gap-2">
+          <Palette className="h-4 w-4" />
+          Custom Colors
+        </div>
+      </SelectItem>
+    </SelectContent>
+  </Select>
+  
+  {/* Custom Color Picker Section */}
+  {colorScheme === "custom" && (
+    <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border">
+      <div className="flex items-center justify-between mb-3">
+        <h6 className="text-sm font-medium">Custom Color Palette</h6>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={addCustomColor}
+          disabled={customColors.length >= 12}
+          className="h-7 px-2"
+        >
+          <span className="text-xs">+ Add Color</span>
+        </Button>
       </div>
       
-      {/* Chart Type and Action Buttons */}
-      <div className="flex flex-wrap gap-2 items-center justify-between sm:justify-between min-w-fit">
-        {/* Chart Type Selection */}
-        <div className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 rounded-lg border">
-          <Select value={chartType} onValueChange={setChartType}>
-            <SelectTrigger className="w-full sm:w-48 border-0 bg-white dark:bg-slate-950 shadow-sm text-xs sm:text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="bar">
-                <div className="flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4" />
-                  <span className="hidden sm:inline">Vertical Bar Chart</span>
-                  <span className="sm:hidden">V-Bar</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="stackedBar">
-                <div className="flex items-center gap-2">
-                  <BarChart4 className="h-4 w-4" />
-                  <span className="hidden sm:inline">Stacked Bar Chart</span>
-                  <span className="sm:hidden">S-Bar</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="horizontalBar">
-                <div className="flex items-center gap-2">
-                  <BarChart4 className="h-4 w-4" />
-                  <span className="hidden sm:inline">Horizontal Bar Chart</span>
-                  <span className="sm:hidden">H-Bar</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="horizontalStackedBar">
-                <div className="flex items-center gap-2">
-                  <BarChart4 className="h-4 w-4" />
-                  <span className="hidden sm:inline">Horizontal Stacked Bar</span>
-                  <span className="sm:hidden">HS-Bar</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="line">
-                <div className="flex items-center gap-2">
-                  <Activity className="h-4 w-4" />
-                  Line Chart
-                </div>
-              </SelectItem>
-              <SelectItem value="area">
-                <div className="flex items-center gap-2">
-                  <AreaChartIcon className="h-4 w-4" />
-                  Area Chart
-                </div>
-              </SelectItem>
-              <SelectItem value="pie">
-                <div className="flex items-center gap-2">
-                  <PieChartIcon className="h-4 w-4" />
-                  Pie Chart
-                </div>
-              </SelectItem>
-              {/* <SelectItem value="stackedPie">
-                <div className="flex items-center gap-2">
-                  <PieChartIcon className="h-4 w-4" />
-                  <span className="hidden sm:inline">Stacked Pie Chart</span>
-                  <span className="sm:hidden">S-Pie</span>
-                </div>
-              </SelectItem> */}
-              <SelectItem value="donut">
-                <div className="flex items-center gap-2">
-                  <PieChartIcon className="h-4 w-4" />
-                  Donut Chart
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex z-50 gap-2">
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="sm"
-                className="flex-1 sm:flex-none z-50 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900 dark:to-blue-900 border-purple-200 dark:border-purple-700 hover:shadow-lg transition-all duration-200"
-              >
-                <Settings className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-              </Button>
-            </DialogTrigger>
-             <DialogContent className="max-w-4xl max-h-[90vh] z-50 overflow-y-auto">
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h4 className="font-semibold text-lg bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">Chart Customization</h4>
-          <p className="text-sm text-muted-foreground">Fine-tune your chart appearance and behavior</p>
-        </div>
-        
-        {/* Export Button */}
-       
-      </div>
-               {/* Basic Settings Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Color Scheme */}
-        <div className="space-y-2">
-<Label className="text-sm font-medium">Color Scheme:</Label>
-<Select value={colorScheme} onValueChange={setColorScheme}>
-  <SelectTrigger>
-    <SelectValue />
-  </SelectTrigger>
-  <SelectContent>
-    <SelectItem value="default">Default</SelectItem>
-    <SelectItem value="ocean">Ocean</SelectItem>
-    <SelectItem value="forest">Forest</SelectItem>
-    <SelectItem value="sunset">Sunset</SelectItem>
-    <SelectItem value="purple">Purple</SelectItem>
-    <SelectItem value="monochrome">Monochrome</SelectItem>
-    <SelectItem value="custom">
-      <div className="flex items-center gap-2">
-        <Palette className="h-4 w-4" />
-        Custom Colors
-      </div>
-    </SelectItem>
-  </SelectContent>
-</Select>
-
-{/* Custom Color Picker Section */}
-{colorScheme === "custom" && (
-  <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border">
-    <div className="flex items-center justify-between mb-3">
-      <h6 className="text-sm font-medium">Custom Color Palette</h6>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={addCustomColor}
-        disabled={customColors.length >= 12}
-        className="h-7 px-2"
-      >
-        <span className="text-xs">+ Add Color</span>
-      </Button>
-    </div>
-    
-    <div className="grid grid-cols-4 gap-2">
-      {customColors.map((color, index) => (
-        <div key={index} className="relative group">
-          <div className="flex items-center gap-1">
-            <input
-              type="color"
-              value={color}
-              onChange={(e) => updateCustomColor(index, e.target.value)}
-              className="w-8 h-8 rounded border border-gray-300 cursor-pointer"
-              title={`Color ${index + 1}`}
-            />
-            {customColors.length > 1 && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => removeCustomColor(index)}
-                className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <X className="h-3 w-3 text-red-500" />
-              </Button>
-            )}
-          </div>
-          <div className="text-xs text-center mt-1 text-gray-500 font-mono">
-            {color.toUpperCase()}
-          </div>
-        </div>
-      ))}
-    </div>
-    
-  </div>
-)}
-</div>
-
-         
-        {/* sort by A to Z */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Sort order:</Label>
-          <Select value={sortOrder} onValueChange={setSortOrder}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">None</SelectItem>
-              <SelectItem value="asc">Value: Ascending</SelectItem>
-              <SelectItem value="desc">Value: Descending</SelectItem>
-              <SelectItem value="alphaAsc">Name: A to Z</SelectItem>
-              <SelectItem value="alphaDesc">Name: Z to A</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        {/* Chart Height */}
-        <div className="space-y-2">
-          <Label className="text-sm">Chart Height:</Label>
-          <Input
-            type="number"
-            value={chartHeight}
-            onChange={(e) => setChartHeight(Number(e.target.value))}
-            min="300"
-            max="800"
-          />
-        </div>
-      </div>
-      <Separator />
-      {/* Data Labels and Legend */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Data Labels */}
-        <div className="space-y-3">
-          <h5 className="font-medium text-sm">Data Labels</h5>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="dataLabels"
-              checked={chartType === "pie" || chartType === "donut" ? showPieLabels : showDataLabels}
-              onCheckedChange={chartType === "pie" || chartType === "donut" ? setShowPieLabels : setShowDataLabels}
-            />
-            <Label htmlFor="dataLabels" className="text-sm">Show Data Labels</Label>
-          </div>
-          
-          {((chartType === "pie" || chartType === "donut") ? showPieLabels : showDataLabels) && 
-           (chartType !== "pie" && chartType !== "donut") && (
-            <div className="ml-6 space-y-2">
-              <Label className="text-sm">Label Position:</Label>
-              <Select value={dataLabelPosition} onValueChange={setDataLabelPosition}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="top">Top (Outside)</SelectItem>
-                  <SelectItem value="inside">Inside</SelectItem>
-                  <SelectItem value="center">Center</SelectItem>
-                  <SelectItem value="bottom">Bottom</SelectItem>
-                </SelectContent>
-              </Select>
-              
-        <div className="space-y-2">
-          <Label className="text-sm">Font Size:</Label>
-          <Input
-            type="number"
-            value={fontSize}
-            onChange={(e) => setFontSize(Number(e.target.value))}
-            min="8"
-            max="20"
-          />
-        </div>
-            </div>
-          )}
-        </div>
-
-        {/* Legend Options */}
-        <div className="space-y-3">
-          <h5 className="font-medium text-sm">Legend</h5>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="showLegend"
-              checked={showLegend}
-              onCheckedChange={setShowLegend}
-            />
-            <Label htmlFor="showLegend" className="text-sm">Show Legend</Label>
-          </div>
-          
-          {showLegend && (
-            <div className="ml-6 space-y-2">
-              <Label className="text-sm">Legend Position:</Label>
-              <Select value={legendPosition} onValueChange={setLegendPosition}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="top">Top</SelectItem>
-                  <SelectItem value="bottom">Bottom</SelectItem>
-                  <SelectItem value="left">Left</SelectItem>
-                  <SelectItem value="right">Right</SelectItem>
-                </SelectContent>
-              </Select>
-              
-
-        <div className="space-y-2">
-          <Label className="text-sm">Legend Font Size:</Label>
-          <Input
-            type="number"
-            value={legendFontSize}
-            onChange={(e) => setLegendFontSize(Number(e.target.value))}
-            min="8"
-            max="20"
-          />
-        </div>
-            </div>
-          )}
-        </div>
-      </div>
-    
-      <div className="grid grid-cols-3 gap-4">
-        <div className="space-y-2">
-          <Label className="text-sm">Max Items:</Label>
-          <Input
-            type="number"
-            value={maxBarsToShow}
-            onChange={(e) => setMaxBarsToShow(Number(e.target.value))}
-            min="5"
-            max="100"
-          />
-        </div>
-
-      </div>
-      <Separator />
-
-      {/* Chart Type Specific Options */}
-      {(chartType === "line" || chartType === "area") && (
-        <div className="space-y-4">
-          <h5 className="font-medium text-sm">Line/Area Options</h5>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-sm">Stroke Width:</Label>
-              <Input
-                type="number"
-                value={strokeWidth}
-                onChange={(e) => setStrokeWidth(Number(e.target.value))}
-                min="1"
-                max="10"
+      <div className="grid grid-cols-4 gap-2">
+        {customColors.map((color, index) => (
+          <div key={index} className="relative group">
+            <div className="flex items-center gap-1">
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => updateCustomColor(index, e.target.value)}
+                className="w-8 h-8 rounded border border-gray-300 cursor-pointer"
+                title={`Color ${index + 1}`}
               />
+              {customColors.length > 1 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => removeCustomColor(index)}
+                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="h-3 w-3 text-red-500" />
+                </Button>
+              )}
             </div>
-            
-            {chartType === "area" && (
-              <div className="space-y-2">
-                <Label className="text-sm">Fill Opacity:</Label>
-                <Input
-                  type="number"
-                  step="0.1"
-                  value={fillOpacity}
-                  onChange={(e) => setFillOpacity(Number(e.target.value))}
-                  min="0"
-                  max="1"
-                />
-              </div>
-            )}
+            <div className="text-xs text-center mt-1 text-gray-500 font-mono">
+              {color.toUpperCase()}
+            </div>
           </div>
-
+        ))}
+      </div>
+      
+    </div>
+  )}
+  </div>
+  
+           
+          {/* sort by A to Z */}
           <div className="space-y-2">
-            <Label className="text-sm">Curve Type:</Label>
-            <Select value={curveType} onValueChange={setCurveType}>
+            <Label className="text-sm font-medium">Sort order:</Label>
+            <Select value={sortOrder} onValueChange={setSortOrder}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="monotone">Monotone (Smooth)</SelectItem>
-                <SelectItem value="linear">Linear (Straight)</SelectItem>
-                <SelectItem value="cardinal">Cardinal (Curved)</SelectItem>
+                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="asc">Value: Ascending</SelectItem>
+                <SelectItem value="desc">Value: Descending</SelectItem>
+                <SelectItem value="alphaAsc">Name: A to Z</SelectItem>
+                <SelectItem value="alphaDesc">Name: Z to A</SelectItem>
               </SelectContent>
             </Select>
           </div>
-
-          {chartType === "line" && (
+          {/* Chart Height */}
+          <div className="space-y-2">
+            <Label className="text-sm">Chart Height:</Label>
+            <Input
+              type="number"
+              value={chartHeight}
+              onChange={(e) => setChartHeight(Number(e.target.value))}
+              min="300"
+              max="800"
+            />
+          </div>
+        </div>
+        <Separator />
+        {/* Data Labels and Legend */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Data Labels */}
+          <div className="space-y-3">
+            <h5 className="font-medium text-sm">Data Labels</h5>
             <div className="flex items-center space-x-2">
               <Checkbox
-                id="showDots"
-                checked={showDots}
-                onCheckedChange={setShowDots}
+                id="dataLabels"
+                checked={chartType === "pie" || chartType === "donut" ? showPieLabels : showDataLabels}
+                onCheckedChange={chartType === "pie" || chartType === "donut" ? setShowPieLabels : setShowDataLabels}
               />
-              <Label htmlFor="showDots" className="text-sm">Show Data Points</Label>
-            </div>
-          )}
-        </div>
-      )}
-
-        {(chartType === "bar" || chartType === "horizontalBar" || chartType === "stackedBar" || chartType === "horizontalStackedBar") && (
-          <div className="space-y-4">
-            <h5 className="font-medium text-sm">Bar Options</h5>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-sm">Bar Radius:</Label>
-                <Input
-                  type="number"
-                  value={barRadius}
-                  onChange={(e) => setBarRadius(Number(e.target.value))}
-                  min="0"
-                  max="20"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label className="text-sm">Bar Gap:</Label>
-                <Input
-                  type="number"
-                  value={barGap}
-                  onChange={(e) => setBarGap(Number(e.target.value))}
-                  min="0"
-                  max="20"
-                />
-              </div>
+              <Label htmlFor="dataLabels" className="text-sm">Show Data Labels</Label>
             </div>
             
-            {(chartType === "stackedBar" || chartType === "horizontalStackedBar") && (
-              <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
-                <p className="text-sm text-blue-700 dark:text-blue-300">
-                  <strong>Stacked Bar Chart:</strong> Values are stacked {chartType === "horizontalStackedBar" ? "horizontally" : "vertically"}. 
-                  Legend is automatically enabled to distinguish between series.
-                </p>
+            {((chartType === "pie" || chartType === "donut") ? showPieLabels : showDataLabels) && 
+             (chartType !== "pie" && chartType !== "donut") && (
+              <div className="ml-6 space-y-2">
+                <Label className="text-sm">Label Position:</Label>
+                <Select value={dataLabelPosition} onValueChange={setDataLabelPosition}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="top">Top (Outside)</SelectItem>
+                    <SelectItem value="inside">Inside</SelectItem>
+                    <SelectItem value="center">Center</SelectItem>
+                    <SelectItem value="bottom">Bottom</SelectItem>
+                  </SelectContent>
+                </Select>
+                
+          <div className="space-y-2">
+            <Label className="text-sm">Font Size:</Label>
+            <Input
+              type="number"
+              value={fontSize}
+              onChange={(e) => setFontSize(Number(e.target.value))}
+              min="8"
+              max="20"
+            />
+          </div>
               </div>
             )}
           </div>
-        )}
-        {(chartType === "pie" || chartType === "donut" || chartType === "stackedPie") && (
-          <div className="space-y-4">
-            <h5 className="font-medium text-sm">
-              {chartType === "stackedPie" ? "Stacked Pie Options" : "Pie/Donut Options"}
-            </h5>
+  
+          {/* Legend Options */}
+          <div className="space-y-3">
+            <h5 className="font-medium text-sm">Legend</h5>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="showLegend"
+                checked={showLegend}
+                onCheckedChange={setShowLegend}
+              />
+              <Label htmlFor="showLegend" className="text-sm">Show Legend</Label>
+            </div>
             
-            {chartType === "stackedPie" && (
-              <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg mb-4">
-                <p className="text-sm text-blue-700 dark:text-blue-300">
-                  <strong>Stacked Pie Chart:</strong> Creates nested pie charts with multiple data series. 
-                  Each Y-axis field creates a new ring. Requires at least 2 Y-axis fields.
-                </p>
+            {showLegend && (
+              <div className="ml-6 space-y-2">
+                <Label className="text-sm">Legend Position:</Label>
+                <Select value={legendPosition} onValueChange={setLegendPosition}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="top">Top</SelectItem>
+                    <SelectItem value="bottom">Bottom</SelectItem>
+                    <SelectItem value="left">Left</SelectItem>
+                    <SelectItem value="right">Right</SelectItem>
+                  </SelectContent>
+                </Select>
+                
+  
+          <div className="space-y-2">
+            <Label className="text-sm">Legend Font Size:</Label>
+            <Input
+              type="number"
+              value={legendFontSize}
+              onChange={(e) => setLegendFontSize(Number(e.target.value))}
+              min="8"
+              max="20"
+            />
+          </div>
               </div>
             )}
+          </div>
+        </div>
+      
+        <div className="grid grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label className="text-sm">Max Items:</Label>
+            <Input
+              type="number"
+              value={maxBarsToShow}
+              onChange={(e) => setMaxBarsToShow(Number(e.target.value))}
+              min="5"
+              max="100"
+            />
+          </div>
+  
+        </div>
+        <Separator />
+  
+        {/* Chart Type Specific Options */}
+        {(chartType === "line" || chartType === "area") && (
+          <div className="space-y-4">
+            <h5 className="font-medium text-sm">Line/Area Options</h5>
             
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-sm">Outer Radius:</Label>
+                <Label className="text-sm">Stroke Width:</Label>
                 <Input
                   type="number"
-                  value={pieOuterRadius}
-                  onChange={(e) => setPieOuterRadius(Number(e.target.value))}
-                  min="50"
-                  max="150"
+                  value={strokeWidth}
+                  onChange={(e) => setStrokeWidth(Number(e.target.value))}
+                  min="1"
+                  max="10"
                 />
               </div>
               
-              {(chartType === "donut" || chartType === "stackedPie") && (
+              {chartType === "area" && (
                 <div className="space-y-2">
-                  <Label className="text-sm">Inner Radius:</Label>
+                  <Label className="text-sm">Fill Opacity:</Label>
                   <Input
                     type="number"
-                    value={pieInnerRadius}
-                    onChange={(e) => setPieInnerRadius(Number(e.target.value))}
+                    step="0.1"
+                    value={fillOpacity}
+                    onChange={(e) => setFillOpacity(Number(e.target.value))}
                     min="0"
-                    max="100"
+                    max="1"
                   />
                 </div>
               )}
             </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-sm">Start Angle:</Label>
-                <Input
-                  type="number"
-                  value={pieStartAngle}
-                  onChange={(e) => setPieStartAngle(Number(e.target.value))}
-                  min="0"
-                  max="360"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label className="text-sm">End Angle:</Label>
-                <Input
-                  type="number"
-                  value={pieEndAngle}
-                  onChange={(e) => setPieEndAngle(Number(e.target.value))}
-                  min="0"
-                  max="360"
-                />
-              </div>
+  
+            <div className="space-y-2">
+              <Label className="text-sm">Curve Type:</Label>
+              <Select value={curveType} onValueChange={setCurveType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="monotone">Monotone (Smooth)</SelectItem>
+                  <SelectItem value="linear">Linear (Straight)</SelectItem>
+                  <SelectItem value="cardinal">Cardinal (Curved)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="showPieLabels"
-                checked={showPieLabels}
-                onCheckedChange={setShowPieLabels}
-              />
-              <Label htmlFor="showPieLabels" className="text-sm">
-                {chartType === "stackedPie" ? "Show Labels (Outer Ring Only)" : "Show Pie Labels"}
-              </Label>
-            </div>
-          </div>
-        )}
-      <Separator />
-   
-
-      {/* General Options */}
-      <div className="space-y-4">
-        <h5 className="font-medium text-sm">General Settings</h5>
-        
-        <div className="flex items-center space-x-6">
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="showGrid"
-              checked={showGrid}
-              onCheckedChange={setShowGrid}
-            />
-            <Label htmlFor="showGrid" className="text-sm">Show Grid</Label>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="showTooltip"
-              checked={showTooltip}
-              onCheckedChange={setShowTooltip}
-            />
-            <Label htmlFor="showTooltip" className="text-sm">Show Tooltip</Label>
-          </div>
-        </div>
-      </div>
-    </div>
-  </DialogContent>
-          </Dialog>
-          
-            <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="flex-1 sm:flex-none bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900 dark:to-emerald-900 border-green-200 dark:border-green-700 hover:shadow-md transition-all duration-200">
-                    <Download className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  </Button>
-                </PopoverTrigger>
-
-                <PopoverContent className="w-40 p-2">
-                  <div className="space-y-1">
-                    <Button variant="ghost" size="sm" onClick={exportChartData} className="w-full justify-start text-sm">
-                      Export CSV
-                    </Button>
-
-                   <Button variant="ghost" size="sm" onClick={exportToPDF} className="w-full justify-start text-sm" disabled={isGeneratingPDF}>
-                      {isGeneratingPDF ? 'Generating...' : 'Export PDF'}
-                    </Button>
-                  </div>
-                </PopoverContent>
-              </Popover>
-        </div>
-      </div>
-    </div>
-
-
-    <div className="space-y-4 mb-4 sm:mb-6 flex flex-row gap-2 items-center justify-between flex-wrap">
-       
-      {/* Single line: X-Axis, Y-Axis, and Range */}
-      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-        
-       
-      {/* X-Axis Selection */}
-        <div className="flex-1 space-y-2">
-          <div className="flex items-center gap-2">
-            <div className="p-1 bg-blue-100 dark:bg-blue-900 rounded flex-shrink-0">
-              <BarChart3 className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-            </div>
-            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-              X-Axis
-            </label>
-          </div>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button 
-                variant="outline" 
-                className="w-full justify-between bg-white dark:bg-slate-950 shadow-sm hover:shadow-md transition-shadow text-xs h-9"
-              >
-                <span className="truncate">
-                  {selectedXAxes.length > 0 ? selectedXAxes.map(field => formatFieldName(field)).join(', ') : 'Select'}
-                </span>
-                <ChevronDown className="h-3 w-3 flex-shrink-0" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[320px] sm:w-96" align="start">
-              <div className="space-y-4">
-                {/* Field Selection Section */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium text-xs">Select Text/String Fields</h4>
-                    <Badge variant="secondary" className="text-xs">
-                      {textFields.length}
-                    </Badge>
-                  </div>
-                  <ScrollArea className="h-32">
-                    <div className="space-y-2">
-                      {textFields.length > 0 ? (
-                        textFields.map(field => (
-                          <div key={`x-${field}`} className="flex items-center space-x-2">
-                            <Checkbox
-                              id={`x-${field}`}
-                              checked={selectedXAxes.includes(field)}
-                              onCheckedChange={(checked) => handleXAxisChange(field, checked)}
-                            />
-                            <label
-                              htmlFor={`x-${field}`}
-                              className="text-xs cursor-pointer flex-1 truncate"
-                            >
-                              {formatFieldName(field)}
-                            </label>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-xs text-muted-foreground text-center py-4">
-                          No text fields found
-                        </p>
-                      )}
-                    </div>
-                  </ScrollArea>
-                </div>
-
-                {/* Category Filters Section - Only show if fields are selected */}
-                {selectedXAxes.length > 0 && Object.keys(availableCategories).length > 0 && (
-                  <>
-                    <Separator />
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2">
-                        <div className="p-1 bg-orange-100 dark:bg-orange-900 rounded flex-shrink-0">
-                          <Eye className="h-3 w-3 text-orange-600 dark:text-orange-400" />
-                        </div>
-                        <h4 className="font-medium text-xs">Category Filters</h4>
-                      </div>
-                      
-                      <ScrollArea className="h-48">
-                        <div className="space-y-3">
-                          {selectedXAxes.map(field => (
-                            <div key={`category-filter-${field}`} className="space-y-2 p-2 border rounded-md bg-gray-50 dark:bg-slate-900">
-                              <div className="flex items-center justify-between">
-                                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
-                                  {formatFieldName(field)}
-                                </label>
-                                <div className="flex items-center gap-2">
-                                  <Badge variant="secondary" className="text-xs">
-                                    {(selectedCategories[field] || []).length}/{(availableCategories[field] || []).length}
-                                  </Badge>
-                                  <div className="flex gap-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => selectAllCategories(field)}
-                                      className="text-xs h-5 px-1"
-                                    >
-                                      All
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => deselectAllCategories(field)}
-                                      className="text-xs h-5 px-1"
-                                    >
-                                      None
-                                    </Button>
-                                  </div>
-                                </div>
-                              </div>
-                              
-                              <div className="max-h-24 overflow-y-auto">
-                                <div className="space-y-1">
-                                  {(availableCategories[field] || []).map(value => (
-                                    <div key={`${field}-${value}`} className="flex items-center space-x-2">
-                                      <Checkbox
-                                        id={`${field}-${value}`}
-                                        checked={(selectedCategories[field] || []).includes(value)}
-                                        onCheckedChange={(checked) => handleCategoryChange(field, value, checked)}
-                                      />
-                                      <label
-                                        htmlFor={`${field}-${value}`}
-                                        className="text-xs cursor-pointer flex-1 break-words"
-                                        title={value}
-                                      >
-                                        {String(value).length > 20 ? `${String(value).substring(0, 20)}...` : String(value)}
-                                      </label>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                              <div className="text-xs text-muted-foreground text-center border-t pt-1">
-                                {(selectedCategories[field] || []).length} of {(availableCategories[field] || []).length} selected
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </ScrollArea>
-                    </div>
-                  </>
-                )}
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
-
-        {/* Y-Axis Selection */}
-        <div className="flex-1 space-y-2">
-          <div className="flex items-center gap-2">
-            <div className="p-1 bg-green-100 dark:bg-green-900 rounded flex-shrink-0">
-              <TrendingUp className="h-3 w-3 text-green-600 dark:text-green-400" />
-            </div>
-            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-              Y-Axis
-            </label>
-          </div>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button 
-                variant="outline" 
-                className="w-full justify-between bg-white dark:bg-slate-950 shadow-sm hover:shadow-md transition-shadow text-xs h-9"
-              >
-                <span className="truncate">
-                  {selectedYAxes.length > 0 ? selectedYAxes.map(field => formatFieldName(field)).join(', ') : 'Select'}
-                </span>
-                <ChevronDown className="h-3 w-3 flex-shrink-0" />
-              </Button>
-            </PopoverTrigger>
-
-<PopoverContent className="w-[320px] sm:w-96" align="start">
-  <div className="space-y-3">
-    <div className="flex items-center justify-between">
-      <h4 className="font-medium text-xs">Select Numeric Fields</h4>
-      <Badge variant="secondary" className="text-xs">
-        {numericFields.length}
-      </Badge>
-    </div>
-    <ScrollArea className="h-40">
-      <div className="space-y-3">
-        {numericFields.length > 0 ? (
-          numericFields.map(field => (
-            <div key={`y-${field}`} className="space-y-2 p-2 border rounded-md bg-gray-50 dark:bg-slate-900">
+  
+            {chartType === "line" && (
               <div className="flex items-center space-x-2">
                 <Checkbox
-                  id={`y-${field}`}
-                  checked={selectedYAxes.includes(field)}
-                  onCheckedChange={(checked) => handleYAxisChange(field, checked)}
+                  id="showDots"
+                  checked={showDots}
+                  onCheckedChange={setShowDots}
                 />
-                <label
-                  htmlFor={`y-${field}`}
-                  className="text-xs cursor-pointer flex-1 truncate font-medium"
-                >
-                  {formatFieldName(field)}
-                </label>
+                <Label htmlFor="showDots" className="text-sm">Show Data Points</Label>
+              </div>
+            )}
+          </div>
+        )}
+  
+          {(chartType === "bar" || chartType === "horizontalBar" || chartType === "stackedBar" || chartType === "horizontalStackedBar") && (
+            <div className="space-y-4">
+              <h5 className="font-medium text-sm">Bar Options</h5>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm">Bar Radius:</Label>
+                  <Input
+                    type="number"
+                    value={barRadius}
+                    onChange={(e) => setBarRadius(Number(e.target.value))}
+                    min="0"
+                    max="20"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label className="text-sm">Bar Gap:</Label>
+                  <Input
+                    type="number"
+                    value={barGap}
+                    onChange={(e) => setBarGap(Number(e.target.value))}
+                    min="0"
+                    max="20"
+                  />
+                </div>
               </div>
               
-              {/* Aggregation type buttons - only show if field is selected */}
-              {selectedYAxes.includes(field) && (
-                <div className="ml-6 space-y-2">
-                  {/* <label className="text-xs text-muted-foreground block">Aggregation Type:</label> */}
-                  <div className="flex gap-1">
-                    {['SUM', 'AVG', 'COUNT'].map((aggType) => (
-                      <button
-                        key={aggType}
-                        type="button"
-                        onClick={() => handleAggregationChange(field, aggType)}
-                        className={`px-2 py-1 text-xs rounded-md border transition-all duration-200 ${
-                          (yAxisAggregations[field] || 'SUM') === aggType
-                            ? 'bg-blue-500 text-white border-blue-500 shadow-sm'
-                            : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-slate-700'
-                        }`}
-                      >
-                        {aggType}
-                      </button>
-                    ))}
-                  </div>
+              {(chartType === "stackedBar" || chartType === "horizontalStackedBar") && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                    <strong>Stacked Bar Chart:</strong> Values are stacked {chartType === "horizontalStackedBar" ? "horizontally" : "vertically"}. 
+                    Legend is automatically enabled to distinguish between series.
+                  </p>
                 </div>
               )}
             </div>
-          ))
-        ) : (
-          <p className="text-xs text-muted-foreground text-center py-4">
-            No numeric fields found
-          </p>
-        )}
-      </div>
-    </ScrollArea>
-  </div>
-</PopoverContent>
-
-          </Popover>
+          )}
+          {(chartType === "pie" || chartType === "donut" || chartType === "stackedPie") && (
+            <div className="space-y-4">
+              <h5 className="font-medium text-sm">
+                {chartType === "stackedPie" ? "Stacked Pie Options" : "Pie/Donut Options"}
+              </h5>
+              
+              {chartType === "stackedPie" && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg mb-4">
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                    <strong>Stacked Pie Chart:</strong> Creates nested pie charts with multiple data series. 
+                    Each Y-axis field creates a new ring. Requires at least 2 Y-axis fields.
+                  </p>
+                </div>
+              )}
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm">Outer Radius:</Label>
+                  <Input
+                    type="number"
+                    value={pieOuterRadius}
+                    onChange={(e) => setPieOuterRadius(Number(e.target.value))}
+                    min="50"
+                    max="150"
+                  />
+                </div>
+                
+                {(chartType === "donut" || chartType === "stackedPie") && (
+                  <div className="space-y-2">
+                    <Label className="text-sm">Inner Radius:</Label>
+                    <Input
+                      type="number"
+                      value={pieInnerRadius}
+                      onChange={(e) => setPieInnerRadius(Number(e.target.value))}
+                      min="0"
+                      max="100"
+                    />
+                  </div>
+                )}
+              </div>
+  
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm">Start Angle:</Label>
+                  <Input
+                    type="number"
+                    value={pieStartAngle}
+                    onChange={(e) => setPieStartAngle(Number(e.target.value))}
+                    min="0"
+                    max="360"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label className="text-sm">End Angle:</Label>
+                  <Input
+                    type="number"
+                    value={pieEndAngle}
+                    onChange={(e) => setPieEndAngle(Number(e.target.value))}
+                    min="0"
+                    max="360"
+                  />
+                </div>
+              </div>
+  
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="showPieLabels"
+                  checked={showPieLabels}
+                  onCheckedChange={setShowPieLabels}
+                />
+                <Label htmlFor="showPieLabels" className="text-sm">
+                  {chartType === "stackedPie" ? "Show Labels (Outer Ring Only)" : "Show Pie Labels"}
+                </Label>
+              </div>
+            </div>
+          )}
+        <Separator />
+     
+  
+        {/* General Options */}
+        <div className="space-y-4">
+          <h5 className="font-medium text-sm">General Settings</h5>
+          
+          <div className="flex items-center space-x-6">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="showGrid"
+                checked={showGrid}
+                onCheckedChange={setShowGrid}
+              />
+              <Label htmlFor="showGrid" className="text-sm">Show Grid</Label>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="showTooltip"
+                checked={showTooltip}
+                onCheckedChange={setShowTooltip}
+              />
+              <Label htmlFor="showTooltip" className="text-sm">Show Tooltip</Label>
+            </div>
+          </div>
         </div>
-    
       </div>
-       {/* Range Slider - Inline */}
-      <div className="w-[200px]">
+    </DialogContent>
+            </Dialog>
+            
+              <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex-1 sm:flex-none bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900 dark:to-emerald-900 border-green-200 dark:border-green-700 hover:shadow-md transition-all duration-200">
+                      <Download className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    </Button>
+                  </PopoverTrigger>
+  
+                  <PopoverContent className="w-40 p-2">
+                    <div className="space-y-1">
+                      <Button variant="ghost" size="sm" onClick={exportChartData} className="w-full justify-start text-sm">
+                        Export CSV
+                      </Button>
+  
+                     <Button variant="ghost" size="sm" onClick={exportToPDF} className="w-full justify-start text-sm" disabled={isGeneratingPDF}>
+                        {isGeneratingPDF ? 'Generating...' : 'Export PDF'}
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+           
+            <TooltipProvider>
+              <FormateTooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                          variant="outline"
+                          size="sm"
+                          className="bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg transition-all duration-300 hover:scale-90 hover:shadow-xl"
+                          onClick={() => {
+                            localStorage.setItem("chatbot_context", JSON.stringify({
+                              DashBoardID,
+                              ChartNo,
+                              chartTitle
+                            }));
+                            document.getElementById("open-chatbot-btn")?.click();
+                          }}
+                        >
+                            <Sparkles className=" h-3 w-3" /> 
+                        </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>ASK AI</p>
+                  </TooltipContent>
+                </FormateTooltip>
+                
+            </TooltipProvider>
+               
+  
+          </div>
+          
+     
+         
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => setShowSummary(prev => !prev)}
+      className="text-xs"
+    >
+    {showSummary ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+    </Button>
+  </div>
+</div>
+
+
+
+    <Separator />
+
+    {/* Totals Display */}
+ {showSummary && selectedYAxes.length > 0 && (
+  <div className="flex flex-col gap-2">
+       <div className="flex flex-row  gap-2 flex-wrap items-center justify-between">
+        <div className="flex flex-row gap-2">
+            {/* X-Axis Selection */}
+         <div className="flex flex-col gap-1">
+           <div className="flex items-center gap-1">
+             <div className=" bg-blue-100 dark:bg-blue-900 rounded flex-shrink-0">
+               <BarChart3 className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+             </div>
+             <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+               X-Axis
+             </label>
+           </div>
+           <Popover>
+             <PopoverTrigger asChild>
+               <Button 
+                 variant="outline" 
+                 className="w-full justify-between bg-white dark:bg-slate-950 shadow-sm hover:shadow-md transition-shadow text-xs h-5"
+               >
+                 <span className="truncate">
+                   {selectedXAxes.length > 0 ? selectedXAxes.map(field => formatFieldName(field)).join(', ') : 'Select'}
+                 </span>
+                 <ChevronDown className="h-3 w-3 flex-shrink-0" />
+               </Button>
+             </PopoverTrigger>
+             <PopoverContent className="w-[320px] sm:w-96" align="start">
+               <div className="space-y-4">
+                 {/* Field Selection Section */}
+                 <div className="space-y-3">
+                   <div className="flex items-center justify-between">
+                     <h4 className="font-medium text-xs">Select Text/String Fields</h4>
+                     <Badge variant="secondary" className="text-xs">
+                       {textFields.length}
+                     </Badge>
+                   </div>
+                   <ScrollArea className="h-32">
+                     <div className="space-y-2">
+                       {textFields.length > 0 ? (
+                         textFields.map(field => (
+                           <div key={`x-${field}`} className="flex items-center space-x-2">
+                             <Checkbox
+                               id={`x-${field}`}
+                               checked={selectedXAxes.includes(field)}
+                               onCheckedChange={(checked) => handleXAxisChange(field, checked)}
+                             />
+                             <label
+                               htmlFor={`x-${field}`}
+                               className="text-xs cursor-pointer flex-1 truncate"
+                             >
+                               {formatFieldName(field)}
+                             </label>
+                           </div>
+                         ))
+                       ) : (
+                         <p className="text-xs text-muted-foreground text-center py-4">
+                           No text fields found
+                         </p>
+                       )}
+                     </div>
+                   </ScrollArea>
+                 </div>
+ 
+                 {/* Category Filters Section - Only show if fields are selected */}
+                 {selectedXAxes.length > 0 && Object.keys(availableCategories).length > 0 && (
+                   <>
+                     <Separator />
+                     <div className="space-y-3">
+                       <div className="flex items-center gap-2">
+                         <div className="p-1 bg-orange-100 dark:bg-orange-900 rounded flex-shrink-0">
+                           <Eye className="h-3 w-3 text-orange-600 dark:text-orange-400" />
+                         </div>
+                         <h4 className="font-medium text-xs">Category Filters</h4>
+                       </div>
+                       
+                       <ScrollArea className="h-48">
+                         <div className="space-y-3">
+                           {selectedXAxes.map(field => (
+                             <div key={`category-filter-${field}`} className="space-y-2 p-2 border rounded-md bg-gray-50 dark:bg-slate-900">
+                               <div className="flex items-center justify-between">
+                                 <label className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
+                                   {formatFieldName(field)}
+                                 </label>
+                                 <div className="flex items-center gap-2">
+                                   <Badge variant="secondary" className="text-xs">
+                                     {(selectedCategories[field] || []).length}/{(availableCategories[field] || []).length}
+                                   </Badge>
+                                   <div className="flex gap-1">
+                                     <Button
+                                       variant="ghost"
+                                       size="sm"
+                                       onClick={() => selectAllCategories(field)}
+                                       className="text-xs h-5 px-1"
+                                     >
+                                       All
+                                     </Button>
+                                     <Button
+                                       variant="ghost"
+                                       size="sm"
+                                       onClick={() => deselectAllCategories(field)}
+                                       className="text-xs h-5 px-1"
+                                     >
+                                       None
+                                     </Button>
+                                   </div>
+                                 </div>
+                               </div>
+                               
+                               <div className="max-h-24 overflow-y-auto">
+                                 <div className="space-y-1">
+                                   {(availableCategories[field] || []).map(value => (
+                                     <div key={`${field}-${value}`} className="flex items-center space-x-2">
+                                       <Checkbox
+                                         id={`${field}-${value}`}
+                                         checked={(selectedCategories[field] || []).includes(value)}
+                                         onCheckedChange={(checked) => handleCategoryChange(field, value, checked)}
+                                       />
+                                       <label
+                                         htmlFor={`${field}-${value}`}
+                                         className="text-xs cursor-pointer flex-1 break-words"
+                                         title={value}
+                                       >
+                                         {String(value).length > 20 ? `${String(value).substring(0, 20)}...` : String(value)}
+                                       </label>
+                                     </div>
+                                   ))}
+                                 </div>
+                               </div>
+                               <div className="text-xs text-muted-foreground text-center border-t pt-1">
+                                 {(selectedCategories[field] || []).length} of {(availableCategories[field] || []).length} selected
+                               </div>
+                             </div>
+                           ))}
+                         </div>
+                       </ScrollArea>
+                     </div>
+                   </>
+                 )}
+               </div>
+             </PopoverContent>
+           </Popover>
+         </div>
+ 
+         {/* Y-Axis Selection */}
+         <div className="flex flex-col gap-1">
+           <div className="flex items-center gap-2">
+             <div className=" bg-green-100 dark:bg-green-900 rounded flex-shrink-0">
+               <TrendingUp className="h-3 w-3 text-green-600 dark:text-green-400" />
+             </div>
+             <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+               Y-Axis
+             </label>
+           </div>
+           <Popover>
+             <PopoverTrigger asChild>
+               <Button 
+                 variant="outline" 
+                 className="w-full justify-between bg-white dark:bg-slate-950 shadow-sm hover:shadow-md transition-shadow text-xs h-5"
+               >
+                 <span className="truncate">
+                   {selectedYAxes.length > 0 ? selectedYAxes.map(field => formatFieldName(field)).join(', ') : 'Select'}
+                 </span>
+                 <ChevronDown className="h-3 w-3 flex-shrink-0" />
+               </Button>
+             </PopoverTrigger>
+             <PopoverContent className="w-[280px] sm:w-60" align="start">
+               <div className="space-y-3">
+                 <div className="flex items-center justify-between">
+                   <h4 className="font-medium text-xs">Select Numeric Fields</h4>
+                   <Badge variant="secondary" className="text-xs">
+                     {numericFields.length}
+                   </Badge>
+                 </div>
+                  <ScrollArea className="h-40">
+                      <div className="space-y-3">
+                        {numericFields.length > 0 ? (
+                          numericFields.map(field => (
+                            <div key={`y-${field}`} className="space-y-2 p-2 border rounded-md bg-gray-50 dark:bg-slate-900">
+                              <div className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`y-${field}`}
+                                  checked={selectedYAxes.includes(field)}
+                                  onCheckedChange={(checked) => handleYAxisChange(field, checked)}
+                                />
+                                <label
+                                  htmlFor={`y-${field}`}
+                                  className="text-xs cursor-pointer flex-1 truncate font-medium"
+                                >
+                                  {formatFieldName(field)}
+                                </label>
+                              </div>
+                              
+                              {/* Aggregation type buttons - only show if field is selected */}
+                              {selectedYAxes.includes(field) && (
+                                <div className="ml-6 space-y-2">
+                                  {/* <label className="text-xs text-muted-foreground block">Aggregation Type:</label> */}
+                                  <div className="flex gap-1">
+                                    {['SUM', 'AVG', 'COUNT'].map((aggType) => (
+                                      <button
+                                        key={aggType}
+                                        type="button"
+                                        onClick={() => handleAggregationChange(field, aggType)}
+                                        className={`px-2 py-1 text-xs rounded-md border transition-all duration-200 ${
+                                          (yAxisAggregations[field] || 'SUM') === aggType
+                                            ? 'bg-blue-500 text-white border-blue-500 shadow-sm'
+                                            : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-slate-700'
+                                        }`}
+                                      >
+                                        {aggType}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-xs text-muted-foreground text-center py-4">
+                            No numeric fields found
+                          </p>
+                        )}
+                      </div>
+                    </ScrollArea>
+               </div>
+             </PopoverContent>
+           </Popover>
+         </div>
+        </div>
+        <div className="flex flex-row gap-2">
+           <div className="">
+              <Select value={chartType} onValueChange={setChartType}>
+                <SelectTrigger className="w-full sm:w-42 border-0 bg-white dark:bg-slate-950 shadow-sm text-xs sm:text-sm ">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bar">
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4" />
+                      <span className="hidden sm:inline">Vertical Bar Chart</span>
+                      <span className="sm:hidden">V-Bar</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="stackedBar">
+                    <div className="flex items-center gap-2">
+                      <BarChart4 className="h-4 w-4" />
+                      <span className="hidden sm:inline">Stacked Bar Chart</span>
+                      <span className="sm:hidden">S-Bar</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="horizontalBar">
+                    <div className="flex items-center gap-2">
+                      <BarChart4 className="h-4 w-4" />
+                      <span className="hidden sm:inline">Horizontal Bar Chart</span>
+                      <span className="sm:hidden">H-Bar</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="horizontalStackedBar">
+                    <div className="flex items-center gap-2">
+                      <BarChart4 className="h-4 w-4" />
+                      <span className="hidden sm:inline">Horizontal Stacked Bar</span>
+                      <span className="sm:hidden">HS-Bar</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="line">
+                    <div className="flex items-center gap-2">
+                      <Activity className="h-4 w-4" />
+                      Line Chart
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="area">
+                    <div className="flex items-center gap-2">
+                      <AreaChartIcon className="h-4 w-4" />
+                      Area Chart
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="pie">
+                    <div className="flex items-center gap-2">
+                      <PieChartIcon className="h-4 w-4" />
+                      Pie Chart
+                    </div>
+                  </SelectItem>
+                  {/* <SelectItem value="stackedPie">
+                    <div className="flex items-center gap-2">
+                      <PieChartIcon className="h-4 w-4" />
+                      <span className="hidden sm:inline">Stacked Pie Chart</span>
+                      <span className="sm:hidden">S-Pie</span>
+                    </div>
+                  </SelectItem> */}
+                  <SelectItem value="donut">
+                    <div className="flex items-center gap-2">
+                      <PieChartIcon className="h-4 w-4" />
+                      Donut Chart
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <TooltipProvider>
+      <div className="flex flex-row p-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
+        <FormateTooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="sm"
+              variant={displayFormat === "D" ? "default" : "ghost"}
+              onClick={() => setDisplayFormat("D")}
+              className={`flex-1 text-xs px-2 py-1 ${displayFormat === "D" ? "shadow-sm" : ""}`}
+            >
+              D
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Show values in default</p>
+          </TooltipContent>
+        </FormateTooltip>
+        
+        <FormateTooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="sm"
+              variant={displayFormat === "K" ? "default" : "ghost"}
+              onClick={() => setDisplayFormat("K")}
+              className={`flex-1 text-xs px-2 py-1 ${displayFormat === "K" ? "shadow-sm" : ""}`}
+            >
+              K
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Show values in thousands</p>
+          </TooltipContent>
+        </FormateTooltip>
+        
+        <FormateTooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="sm"
+              variant={displayFormat === "M" ? "default" : "ghost"}
+              onClick={() => setDisplayFormat("M")}
+              className={`flex-1 text-xs px-2 py-1 ${displayFormat === "M" ? "shadow-sm" : ""}`}
+            >
+              M
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Show values in millions</p>
+          </TooltipContent>
+        </FormateTooltip>
+      </div>
+    </TooltipProvider>
+
+        </div>
+         
+       </div>
+        {/* <Separator /> */}
+      <div className="flex flex-row  gap-2 flex-wrap items-center justify-between">
+          <div className="flex flex-row gap-1 ">
+          
+          {selectedYAxes.map(field => (
+            <div key={field} className="bg-white dark:bg-slate-950 p-1 rounded-lg border shadow-sm hover:shadow-md transition-shadow">
+              <div className="text-xs font-medium text-muted-foreground mb-1 truncate">
+                 {(yAxisAggregations[field] || 'SUM')} of {formatFieldName(field)}
+              </div>
+              <div className="text-xs font-bold text-gray-900 dark:text-gray-100 truncate">
+               {formatValue(calculateTotal(field), field)}
+              </div>
+            </div>
+          ))}
+          
+        </div>
+        
+   <div className="flex flex-row gap-2 ">
+         
+        
+     
+     
+   
+      <div className="w-[150px]">
             {selectedYAxes.length > 0 && selectedRangeField && (
           <div className="flex-1 space-y-2">
            
@@ -2713,7 +2735,7 @@ return (
                   <span className="text-blue-700 dark:text-blue-300 truncate">
                     {formatFieldName(selectedRangeField)}
                   </span>
-                 <div className="flex items-center space-x-1 font-mono bg-white dark:bg-slate-800 px-1 py-1 rounded border text-xs">
+                 <div className="flex items-center space-x-1 font-mono bg-white dark:bg-slate-800  rounded border text-xs">
   <input
     type="text"
     value={rangeMin}
@@ -2722,7 +2744,8 @@ return (
       const num = Number(raw);
       if (!isNaN(num)) setRangeMin(num);
     }}
-    className="w-10 bg-transparent text-blue-600 dark:text-blue-400 text-right outline-none"
+    className="w-6 bg-transparent text-blue-600 dark:text-blue-400 text-right outline-none text-xs "
+    style={{fontSize:"10px"}}
   />
   <span className="text-gray-400">-</span>
   <input
@@ -2733,17 +2756,18 @@ return (
       const num = Number(raw);
       if (!isNaN(num)) setRangeMax(num);
     }}
-    className="w-10 bg-transparent text-blue-600 dark:text-blue-400 text-right outline-none"
+    className="w-6 bg-transparent text-blue-600 dark:text-blue-400 text-right outline-none text-xs"
+       style={{fontSize:"10px"}}
   />
 </div>
 
 </div>
                 
                 {/* Compact Range Slider */}
-<div className="relative w-full h-6 flex items-center" ref={sliderRef}>
-  <div className="absolute w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg shadow-inner"></div>
+<div className="relative w-full h-1 flex items-center" ref={sliderRef}>
+  <div className="absolute w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-lg shadow-inner"></div>
   <div
-    className="absolute h-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg shadow-md"
+    className="absolute h-1 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg shadow-md"
     style={{
       left: `${valueToPercent(rangeMin)}%`,
       width: `${valueToPercent(rangeMax) - valueToPercent(rangeMin)}%`
@@ -2780,7 +2804,7 @@ return (
       const adjustedValue = Math.max(dataMin, Math.min(value, rangeMax - (dataMax - dataMin) * 0.01));
       setRangeMin(Math.floor(adjustedValue));
     }}
-    className="absolute w-full h-2 bg-transparent appearance-none cursor-pointer opacity-0 z-10"
+    className="absolute w-full h-1 bg-transparent appearance-none cursor-pointer opacity-0 z-10"
   />
   
   <input
@@ -2794,7 +2818,7 @@ return (
       const adjustedValue = Math.min(dataMax, Math.max(value, rangeMin + (dataMax - dataMin) * 0.01));
       setRangeMax(Math.floor(adjustedValue));
     }}
-    className="absolute w-full h-2 bg-transparent appearance-none cursor-pointer opacity-0 z-10"
+    className="absolute w-full h-1 bg-transparent appearance-none cursor-pointer opacity-0 z-10"
   />
 </div>
               </div>
@@ -2802,106 +2826,100 @@ return (
           </div>
         )}
       </div>
-         
-     
-    </div>
-
-    <Separator />
-
-    {/* Totals Display */}
-    {selectedYAxes.length > 0 && (
-      
-      <div className="mt-4 sm:mt-6 flex flex-row items-center justify-between">
-        
-        <div className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-3 gap-3 ">
-          
-         {selectedYAxes.map(field => (
-  <div key={field} className="bg-white dark:bg-slate-950 p-3 rounded-lg border shadow-sm hover:shadow-md transition-shadow">
-    <div className="text-xs font-medium text-muted-foreground mb-1 truncate">
-      {(yAxisAggregations[field] || 'SUM')} of {formatFieldName(field)}
-    </div>
-    <div className="text-sm font-bold text-gray-900 dark:text-gray-100 truncate">
-      {formatValue(calculateTotal(field), field)}
-    </div>
-  </div>
-))}
-          
-        </div>
-  <TooltipProvider>
-  <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
-    <FormateTooltip>
-      <TooltipTrigger asChild>
-        <Button
-          size="sm"
-          variant={displayFormat === "D" ? "default" : "ghost"}
-          onClick={() => setDisplayFormat("D")}
-          className={`flex-1 text-xs px-2 py-1 ${displayFormat === "D" ? "shadow-sm" : ""}`}
-        >
-          Default
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>
-        <p>Show values in default</p>
-      </TooltipContent>
-    </FormateTooltip>
-    
-    <FormateTooltip>
-      <TooltipTrigger asChild>
-        <Button
-          size="sm"
-          variant={displayFormat === "K" ? "default" : "ghost"}
-          onClick={() => setDisplayFormat("K")}
-          className={`flex-1 text-xs px-2 py-1 ${displayFormat === "K" ? "shadow-sm" : ""}`}
-        >
-          K
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>
-        <p>Show values in thousands</p>
-      </TooltipContent>
-    </FormateTooltip>
-    
-    <FormateTooltip>
-      <TooltipTrigger asChild>
-        <Button
-          size="sm"
-          variant={displayFormat === "M" ? "default" : "ghost"}
-          onClick={() => setDisplayFormat("M")}
-          className={`flex-1 text-xs px-2 py-1 ${displayFormat === "M" ? "shadow-sm" : ""}`}
-        >
-          M
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>
-        <p>Show values in millions</p>
-      </TooltipContent>
-    </FormateTooltip>
-  </div>
-</TooltipProvider>
+            
+</div>
+      </div>
       </div>
     )}
   </CardHeader>
 
-  <CardContent className="p-2 sm:p-4 pt-0">
-    {chartData.length > 0 && selectedXAxes.length > 0 && selectedYAxes.length > 0 ? (
-  <div 
-    id={`chart-container-${ChartNo}`} 
-    key={`chart-${JSON.stringify(yAxisAggregations)}-${selectedYAxes.join(',')}-${tasks.length}`} // ✅ Enhanced key
-    style={{ width: "100%", height: chartHeight }}
-  >
-    <ResponsiveContainer>{renderChart()}</ResponsiveContainer>
+      <CardContent className="relative p-0">
+        {chartData.length > 0 && selectedXAxes.length > 0 && selectedYAxes.length > 0 ? (
+          <div
+            id={`chart-container-${ChartNo}`}
+            className="w-full h-full min-h-[300px]"
+            style={{
+              height: `${chartHeight}px`,
+              maxHeight: 'calc(100vh - 300px)' // Adjust based on your layout
+            }}
+          >
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              debounce={150} // Helps with resize performance
+            >
+              {renderChart()}
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center text-muted-foreground">
+            {getChartTypeIcon(chartType)}
+            <div className="mt-4 text-center px-4">
+              <BarChart3 className="h-8 w-8 sm:h-12 sm:w-12 mb-4 mx-auto" />
+              <p className="text-base sm:text-lg mb-2">Configure Your Chart</p>
+              <p className="text-xs sm:text-sm">Select fields from the dropdowns above to display your chart</p>
+            </div>
+          </div>
+        )}
+      </CardContent>
+
+    </Card>
+
+         <div className="w-full max-h-[80vh] overflow-y-auto">
+              <div className="overflow-auto rounded-lg border">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-slate-100 dark:bg-slate-800">
+                    <tr>
+                      {/* Dynamic X-Axis headers */}
+                      {selectedXAxes.map(x => (
+                        <th key={x} className="p-2 border">{formatFieldName(x)}</th>
+                      ))}
+                      {/* Y-Axis headers */}
+                      {selectedYAxes.map(field => (
+                        <th key={field} className="p-2 border text-right">{formatFieldName(field)}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  
+                  <tbody>
+                    {chartData.map((row, index) => {
+                      const xValues = String(row.combinedKey).split(" | ");
+                      return (
+                        <tr key={index} className={index % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50 dark:bg-slate-800'}>
+                          {/* Split combinedKey into X-axis fields */}
+                          {selectedXAxes.map((xField, i) => (
+                            <td key={xField} className="p-2 border">
+                              {xValues[i] || ""}
+                            </td>
+                          ))}
+                          {/* Raw values for Y fields */}
+                          {selectedYAxes.map(field => (
+                            <td key={field} className="p-2 border text-right">
+                              {(row[field] ?? 0).toLocaleString()}
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+          
+                    {/* Totals row */}
+                    <tr className="font-semibold bg-slate-100 dark:bg-slate-700">
+                      {selectedXAxes.map((_, i) => (
+                        <td key={i} className="p-2 border text-right">
+                          {i === selectedXAxes.length - 1 ? "Total:" : ""}
+                        </td>
+                      ))}
+                      {selectedYAxes.map(field => (
+                        <td key={field} className="p-2 border text-right">
+                          {calculateTotal(field).toLocaleString()}
+                        </td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
   </div>
-) : (
-      <div className="flex flex-col items-center justify-center h-48 sm:h-64 text-muted-foreground">
-        {getChartTypeIcon(chartType)}
-        <div className="mt-4 text-center px-4">
-          <BarChart3 className="h-8 w-8 sm:h-12 sm:w-12 mb-4 mx-auto" />
-          <p className="text-base sm:text-lg mb-2">Configure Your Chart</p>
-          <p className="text-xs sm:text-sm">Select fields from the dropdowns above to display your chart</p>
-        </div>
-      </div>
-    )}
-  </CardContent>
-</Card>
+
 )
 }

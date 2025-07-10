@@ -16,6 +16,7 @@ import InvoiceBookingPage from "./pages/InvoiceBookingPage";
 import InvoiceListPage from "./pages/InvoiceListPage";
 import RfqPage from "./pages/RfqPage";
 import RfqListPage from "./pages/RfqListPage";
+import ChartPreview from "./components/iStCharts/ChartPreview";
 
 const App = () => {
   const router = createBrowserRouter([
@@ -61,6 +62,8 @@ const App = () => {
             { path: "/edit-rfq/:id", element: <RfqPage /> },
             { path: "/view-rfq/:id", element: <RfqPage /> },
             { path: "rfq-list", element: <RfqListPage /> },
+            { path: "/chart-preview", element: <ChartPreview /> },
+
           ],
         },
       ],

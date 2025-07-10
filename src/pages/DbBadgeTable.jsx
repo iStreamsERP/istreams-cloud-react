@@ -176,6 +176,25 @@ const DbBadgeTable = () => {
       setIsLoading(false);
     }
   };
+const isNumericColumn = (key) => {
+  if (!dbData.length) return false;
+
+  const lowerKey = key.toLowerCase();
+
+  // Match only strict numeric indicators
+  const numericKeywords = ["amount", "price", "cost", "qty", "quantity", "total", "rate", "count"];
+
+  const isKeywordMatch = numericKeywords.some((kw) => lowerKey.includes(kw));
+  if (!isKeywordMatch) return false;
+
+  // Confirm that the majority of values are numeric
+  const numericCount = dbData.reduce((count, row) => {
+    const value = row[key];
+    return isNumericValue(value) ? count + 1 : count;
+  }, 0);
+
+  return numericCount / dbData.length > 0.7;
+};
 
   const nextPage = () =>
     currentPage < totalPages && setCurrentPage(currentPage + 1);
@@ -1011,31 +1030,7 @@ const ExcelFilter = ({ column }) => {
     return !isNaN(parseFloat(value)) && isFinite(value);
   };
   
-  // Determine if a column contains numeric values
-  const isNumericColumn = (key) => {
-    if (!dbData.length) return false;
-    
-    // Check if column name suggests numeric data
-    if (key.toLowerCase().includes('amount') || 
-        key.toLowerCase().includes('price') || 
-        key.toLowerCase().includes('cost') || 
-        key.toLowerCase().includes('qty') || 
-        key.toLowerCase().includes('count') ||
-        key.toLowerCase().includes('total') ||
-        key.toLowerCase().includes('num') ||
-        key.toLowerCase().includes('id')) {
-      return true;
-    }
-    
-    // Check if most values in this column are numeric
-    const numericCount = dbData.reduce((count, row) => {
-      const value = row[key];
-      return isNumericValue(value) ? count + 1 : count;
-    }, 0);
-    
-    // If more than 70% of values are numeric, consider it a numeric column
-    return numericCount / dbData.length > 0.7;
-  };
+
   
   // Calculate column types once
   const columnTypes = dbData.length > 0 
@@ -1165,9 +1160,8 @@ const ExcelFilter = ({ column }) => {
                   Object.keys(filteredData[0]).map((key) => (
                     <TableHead
                       key={key}
-                      className={`whitespace-nowrap font-medium relative ${
-                        columnTypes[key] === 'numeric' ? 'text-right' : ''
-                      }`}
+                     className={`whitespace-nowrap font-medium ${columnTypes[key] === 'numeric' ? 'text-right' : 'text-left'}`}
+
                     >
                       <div className="flex items-center justify-between gap-1">
                         <span className="flex-1">{formatHeader(key)}</span>
@@ -1198,9 +1192,8 @@ const ExcelFilter = ({ column }) => {
                     {Object.keys(item).map((key) => (
                       <TableCell
                         key={key}
-                        className={`py-3 max-w-[200px] truncate ${
-                          columnTypes[key] === 'numeric' ? 'text-right' : ''
-                        }`}
+                        className={`py-3 max-w-[200px] truncate ${columnTypes[key] === 'numeric' ? 'text-right' : 'text-left'}`}
+
                       >
                         {key.toLowerCase().includes("date")
                           ? formatDate(item[key])

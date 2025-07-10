@@ -1,24 +1,53 @@
-import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import React, { useEffect, useState } from "react";
+import { GrossSalaryChart } from "./demo";
+import { callSoapService } from "@/api/callSoapService";
+import { useAuth } from "@/contexts/AuthContext";
 
-const ChartPreview = ({ chartData }) => {
-  if (!Array.isArray(chartData) || chartData.length === 0) return null;
+const ChartPreview = () => {
+  const [data, setData] = useState(null);
+  const [rawData, setRawData] = useState([]);
+  const { userData } = useAuth();
 
-  const keys = Object.keys(chartData[0]);
-  const xKey = keys[0];
-  const yKey = keys[1];
+  useEffect(() => {
+    const stored = sessionStorage.getItem("chartPreviewData");
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      setData(parsed);
+      fetchChartData(parsed.DashBoardID, parsed.ChartNo);
+    }
+  }, []);
+
+  const fetchChartData = async (DashBoardID, ChartNo) => {
+    try {
+      const chartID = { DashBoardID, ChartNo };
+      const res = await callSoapService(userData.clientURL, "BI_GetDashboard_Chart_Data", chartID);
+      if (Array.isArray(res)) {
+        setRawData(res);
+      } else {
+        console.error("Expected array but got:", res);
+        setRawData([]);
+      }
+    } catch (err) {
+      console.error("Error fetching chart data:", err);
+    }
+  };
+
+  if (!data) return <p>Loading preview...</p>;
+
+  // Get table headers from the first row keys
+  const tableHeaders = rawData.length > 0 ? Object.keys(rawData[0]) : [];
 
   return (
-    <div className="w-full h-64 mt-4">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey={xKey} />
-          <YAxis />
-          <Tooltip />
-          <Bar dataKey={yKey} fill="#6366f1" />
-        </BarChart>
-      </ResponsiveContainer>
+    <div className="p-6 space-y-10">
+      <GrossSalaryChart
+        DashBoardID={data.DashBoardID}
+        ChartNo={data.ChartNo}
+        chartTitle={data.chartTitle}
+        chartXAxis={data.chartXAxis}
+        chartYAxis={data.chartYAxis}
+      />
+
+   
     </div>
   );
 };

@@ -14,6 +14,8 @@ import Chat from "./pages/Chat";
 import ChartDetails from "./pages/ChartDetails";
 import InvoiceBookingPage from "./pages/InvoiceBookingPage";
 import InvoiceListPage from "./pages/InvoiceListPage";
+import RfqPage from "./pages/RfqPage";
+import RfqListPage from "./pages/RfqListPage";
 
 const App = () => {
   const router = createBrowserRouter([
@@ -54,6 +56,11 @@ const App = () => {
             { path: "/edit-invoice/:id", element: <InvoiceBookingPage /> },
             { path: "/view-invoice/:id", element: <InvoiceBookingPage /> },
             { path: "/invoice-list", element: <InvoiceListPage /> },
+
+            { path: "/new-rfq", element: <RfqPage /> },
+            { path: "/edit-rfq/:id", element: <RfqPage /> },
+            { path: "/view-rfq/:id", element: <RfqPage /> },
+            { path: "rfq-list", element: <RfqListPage /> },
           ],
         },
       ],

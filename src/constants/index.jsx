@@ -58,13 +58,18 @@ export const getNavbarLinks = (isAdmin) => [
         icon: NotebookPen,
         path: "/new-invoice",
       },
+      {
+        label: "RFQ Booking",
+        icon: NotebookPen,
+        path: "/new-rfq",
+      },
     ],
   },
   {
-    title: "SaaS Product",
+    title: "Add on Products",
     links: [
       {
-        label: "DMS",
+        label: "Document Management System",
         icon: FileSearch,
         path: "https://dms.istreams-erp.com/",
       },

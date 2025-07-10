@@ -261,7 +261,7 @@ const RecentMessage = () => {
   if (loading && groupedMessages.length === 0) {
     return (
       <>
-        <Card className="w-[full] max-h-[60vh] border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 rounded-lg shadow-sm">
+        <Card className="w-[full] h-[63vh] border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 rounded-lg shadow-sm">
           <CardHeader className="border-b border-gray-200 dark:border-gray-800 p-4">
             <div className="flex items-center gap-2">
               <MessageSquare className="w-5 h-5 text-blue-500" />
@@ -287,17 +287,17 @@ const RecentMessage = () => {
 
   return (
     <>
-      <Card className="w-full max-h-[60vh] border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 rounded-lg shadow-sm">
+      <Card className="w-full h-[63vh] border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 rounded-lg shadow-sm">
         <CardHeader className="border-b flex flex-row flex-wrap justify-between border-gray-200 dark:border-gray-800 p-2">
           <div className="flex items-center gap-2">
-            <MessageSquare className="w-5 h-5 text-blue-500" />
+            <MessageSquare className="w-4 h-4 text-blue-500" />
             <h3 className="text-sm font-semibold">Recent Messages</h3>
           </div>
-          <button className="flex items-center gap-1 px-3 py-1 text-sm font-medium rounded-lg bg-blue-50 dark:bg-gray-800 hover:bg-blue-100 whitespace-nowrap dark:hover:bg-gray-700 transition-colors duration-200 text-blue-600 dark:text-blue-400" onClick={() => navigate("/chat")}>
-            View All <ChevronRight className="w-4 h-4" />
+          <button className="flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-lg bg-blue-50 dark:bg-gray-800 hover:bg-blue-100 whitespace-nowrap dark:hover:bg-gray-700 transition-colors duration-200 text-blue-600 dark:text-blue-400" onClick={() => navigate("/chat")}>
+            View All <ChevronRight className="w-3 h-3" />
           </button>
         </CardHeader>
-        <CardContent className="p-0 max-h-[360px] overflow-y-auto">
+        <CardContent className="p-0 h-[63vh] overflow-y-auto">
           {groupedMessages.length > 0 ? (
             <ul>
               {groupedMessages.map((msg) => (

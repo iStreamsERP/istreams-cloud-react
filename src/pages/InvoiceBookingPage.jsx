@@ -19,9 +19,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { convertDataModelToStringData } from "@/utils/dataModelConverter";
 import { convertServiceDate } from "@/utils/dateUtils";
-import OrderTracking from "../components/InvoiceBookingComponents/OrderTracking";
-import InvoiceChatbot from "../components/InvoiceBookingComponents/InvoiceChatbot";
-import UploadInvoice from "../components/InvoiceBookingComponents/UploadInvoice";
+import OrderTracking from "../components/invoice/OrderTracking";
+import InvoiceChatbot from "../components/invoice/InvoiceChatbot";
+import UploadInvoice from "../components/invoice/UploadInvoice";
 
 const ACCEPTED_FILE_TYPES = {
   "image/*": [".png", ".jpg", ".jpeg"],

@@ -10,7 +10,7 @@ import { ArrowLeft, Download, Search, Filter, TableIcon, BarChart3, Printer, Che
 import { useAuth } from "@/contexts/AuthContext"
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
-import { callSoapService } from "@/services/callSoapService"
+import { callSoapService } from "@/api/callSoapService"
 import {
   Breadcrumb,
   BreadcrumbItem,

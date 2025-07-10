@@ -5,7 +5,7 @@ import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronRight, MessageSquare, X, Bell } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { callSoapService } from "@/services/callSoapService";
+import { callSoapService } from "@/api/callSoapService";
 
 const DEFAULT_IMAGE = "/default-user.png"; // should be round image
 const FETCH_INTERVAL = 15000; // More frequent updates (15 seconds)

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/AuthContext";
 import animationData from "@/lotties/crm-animation-lotties.json";
-import { callSoapService } from "@/services/callSoapService";
+import { callSoapService } from "@/api/callSoapService";
 import { Eye, EyeOff, Loader2, Mail,Lock} from "lucide-react";
 import { useCallback, useState } from "react";
 import Lottie from "react-lottie";

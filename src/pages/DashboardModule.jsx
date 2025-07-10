@@ -28,7 +28,7 @@ import {
   Activity,
   Shield,
 } from "lucide-react";
-import { callSoapService } from "@/services/callSoapService";
+import { callSoapService } from "@/api/callSoapService";
 
 // Array of professional icons to cycle through
 const dashboardIcons = [

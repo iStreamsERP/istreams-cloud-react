@@ -12,6 +12,8 @@ import DbBadgeTable from "./pages/DbBadgeTable";
 import DashboardModulePage from "./pages/DashboardModule";
 import Chat from "./pages/Chat";
 import ChartDetails from "./pages/ChartDetails";
+import InvoiceBookingPage from "./pages/InvoiceBookingPage";
+import InvoiceListPage from "./pages/InvoiceListPage";
 
 const App = () => {
   const router = createBrowserRouter([
@@ -37,14 +39,23 @@ const App = () => {
             { index: true, element: <HomePage /> },
 
             { path: "/dashboard", element: <DashboardPage /> },
-            { path: "/dashboard-details/:DashBoardID/:BadgeNo" , element:<DbBadgeTable /> },
-            { path: "/dashboard-module/:module" , element:<DashboardModulePage /> },
-            { path: "/chat" , element:<Chat /> },
-            { path: "/Chartdetails" , element:<ChartDetails /> }
+            {
+              path: "/dashboard-details/:DashBoardID/:BadgeNo",
+              element: <DbBadgeTable />,
+            },
+            {
+              path: "/dashboard-module/:module",
+              element: <DashboardModulePage />,
+            },
+            { path: "/chat", element: <Chat /> },
+            { path: "/Chartdetails", element: <ChartDetails /> },
 
-
-          ]
-        }
+            { path: "/new-invoice", element: <InvoiceBookingPage /> },
+            { path: "/edit-invoice/:id", element: <InvoiceBookingPage /> },
+            { path: "/view-invoice/:id", element: <InvoiceBookingPage /> },
+            { path: "/invoice-list", element: <InvoiceListPage /> },
+          ],
+        },
       ],
     },
     {

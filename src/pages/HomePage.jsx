@@ -14,7 +14,7 @@ import { toTitleCase } from "@/utils/stringUtils";
 import { ArrowLeft, TrendingDown, TrendingUp } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { callSoapService } from "@/services/callSoapService";
+import { callSoapService } from "@/api/callSoapService";
 
 const HomePage = () => {
   const { userData } = useAuth();

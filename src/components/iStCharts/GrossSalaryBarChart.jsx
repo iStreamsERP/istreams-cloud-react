@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { toPng } from 'html-to-image';
 import jsPDF from 'jspdf';
 import html2canvas from "html2canvas"
-import { callSoapService } from "@/services/callSoapService"
+import { callSoapService } from "@/api/callSoapService"
 import { useNavigate } from "react-router-dom"
 import ChatbotUI from "../ChatbotUI"
 export function GrossSalaryChart({ DashBoardID, ChartNo, chartTitle, chartType: initialChartType = "bar", chartXAxis, chartYAxis }) {

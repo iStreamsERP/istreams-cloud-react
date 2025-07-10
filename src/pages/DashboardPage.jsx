@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CalendarDays, ArrowRight } from "lucide-react";
-import { callSoapService } from "@/services/callSoapService";
+import { callSoapService } from "@/api/callSoapService";
 
 const AnimatedNumber = ({ value, generateRandomValue }) => {
   const [displayValue, setDisplayValue] = useState(generateRandomValue());

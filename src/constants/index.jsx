@@ -1,27 +1,61 @@
-import { BaggageClaim, ChartColumn, Cog, Grid2x2Plus, Headset, Home, Landmark, MessageCircleQuestion, MonitorCog, NotepadText, Package, PackagePlus, Settings, ShoppingBag, Tags, UserCheck, UserCog, UserPlus, Users } from "lucide-react";
+import {
+  CalendarClock,
+  ClipboardListIcon,
+  FileCheck2,
+  FileSearch,
+  FileText,
+  Home,
+  Landmark,
+  LayoutDashboard,
+  LayoutGrid,
+  LibraryBig,
+  NotebookPen,
+  ShieldUser,
+  Upload,
+  UploadCloud,
+  UserCog,
+  Users,
+} from "lucide-react";
 
-export const navbarLinks = [
+export const getNavbarLinks = (isAdmin) => [
+  ...(isAdmin
+    ? [
+        {
+          title: "MAIN",
+          links: [
+            {
+              label: "Dashboard",
+              icon: Home,
+              children: [
+                {
+                  label: "Finance",
+                  icon: Landmark,
+                  path: "/dashboard-module/Finance",
+                },
+                {
+                  label: "HRMS",
+                  icon: Users,
+                  path: "/dashboard-module/HRMS",
+                },
+                {
+                  label: "Production",
+                  icon: UserCog,
+                  path: "/dashboard-module/Production",
+                },
+              ],
+            },
+          ],
+        },
+      ]
+    : []),
   {
-    title: "Dashboard",
+    title: "AI Integration",
     links: [
       {
-        label: "Finance",
-        icon: Landmark ,
-        path: "/dashboard-module/Finance",
+        label: "Invoice Booking",
+        icon: NotebookPen,
+        path: "/new-invoice",
       },
-      {
-        label: "HRMS",
-        icon: Users,
-        path: "/dashboard-module/HRMS",
-      },
-      {
-        label: "Production",
-        icon: UserCog ,
-        path: "/dashboard-module/Production",
-      },
-      
     ],
   },
-  
- 
 ];

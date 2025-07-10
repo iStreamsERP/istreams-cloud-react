@@ -44,7 +44,7 @@ import {
 } from "@/services/chatService";
 import Peer from 'peerjs';
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { callSoapService } from "@/services/callSoapService";
+import { callSoapService } from "@/api/callSoapService";
 
 const Chat = () => {
   const { userData } = useAuth();

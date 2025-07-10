@@ -9,7 +9,7 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table";
-import { callSoapService } from "@/services/callSoapService";
+import { callSoapService } from "@/api/callSoapService";
 
 const ProgressTable = ({ DashBoardID, ProgressTableNo }) => {
   const { userData } = useAuth();

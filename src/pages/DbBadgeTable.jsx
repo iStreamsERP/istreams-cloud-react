@@ -48,7 +48,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ArrowLeft, Download, Filter, Printer, Search, X, ChevronDown } from "lucide-react";
-import { callSoapService } from "@/services/callSoapService";
+import { callSoapService } from "@/api/callSoapService";
 
 const DbBadgeTable = () => {
   const { DashBoardID, BadgeNo } = useParams();

@@ -6,7 +6,7 @@ import { useMediaQuery } from "@uidotdev/usehooks";
 import { useEffect, useRef, useState } from "react";
 import { useClickOutside } from "../hooks/use-click-outside";
 import Footer from "@/layouts/Footer";
-import { Toaster } from "@/components/ui/toaster"
+import { Toaster } from "@/components/ui/toaster";
 import ChatbotUI from "@/components/ChatbotUI";
 
 const Layout = () => {
@@ -28,23 +28,22 @@ const Layout = () => {
       <div
         className={cn(
           "pointer-events-none fixed inset-0 -z-10 bg-black opacity-0 transition-opacity",
-          !collapsed && "max-md:pointer-events-auto max-md:z-50 max-md:opacity-30"
+          !collapsed &&
+            "max-md:pointer-events-auto max-md:z-50 max-md:opacity-30"
         )}
       />
-      <Sidebar
-        ref={sidebarRef}
-        collapsed={collapsed}
-      />
-      <div className={cn("transition-[margin] duration-300", collapsed ? "md:ml-[70px]" : "md:ml-[240px]")}>
-        <Header
-          collapsed={collapsed}
-          setCollapsed={setCollapsed}
-        />
-        <main className="h-[calc(100vh-108px)] overflow-y-auto overflow-x-hidden p-2">
+      <Sidebar ref={sidebarRef} collapsed={collapsed} />
+      <div
+        className={cn(
+          "transition-[margin] duration-300",
+          collapsed ? "md:ml-[50px]" : "md:ml-[180px]"
+        )}
+      >
+        <Header collapsed={collapsed} setCollapsed={setCollapsed} />
+        <main className="h-[calc(100vh-10vh)] overflow-y-auto overflow-x-hidden p-2">
           <Outlet />
           <Toaster />
         </main>
-        <Footer />
       </div>
       <ChatbotUI />
     </div>

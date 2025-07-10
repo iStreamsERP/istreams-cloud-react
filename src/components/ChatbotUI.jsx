@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, Minimize2 ,Sparkles} from 'lucide-react';
-import { callSoapService } from '@/services/callSoapService';
+import { callSoapService } from '@/api/callSoapService';
 import { useAuth } from '@/contexts/AuthContext';
 import axios from 'axios';
 

@@ -1,9 +1,6 @@
+import Notification from "@/components/Notification";
 import { useTheme } from "@/components/theme-provider";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -12,44 +9,41 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Bell,
   BellOff,
+  BriefcaseBusiness,
+  CalendarCheck2,
   CloudMoon,
   CloudSun,
+  FileSearch,
+  LayoutGrid,
   LogOut,
   Maximize,
-  MenuIcon,
   Minimize,
   PanelLeftClose,
   Settings2,
 } from "lucide-react";
-import PropTypes from "prop-types";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import Notification from "@/components/Notification";
 
 export const Header = ({ collapsed, setCollapsed }) => {
   const { userData, logout } = useAuth();
   const { theme, setTheme } = useTheme();
-
   const navigate = useNavigate();
-
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showNotification, setShowNotification] = useState(true); // Default notification is on
+  const [showNotification, setShowNotification] = useState(false); // Start as hidden
 
   const toggleFullScreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen();
       setIsFullscreen(true);
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-        setIsFullscreen(false);
-      }
+    } else if (document.exitFullscreen) {
+      document.exitFullscreen();
+      setIsFullscreen(false);
     }
   };
 
@@ -61,94 +55,193 @@ export const Header = ({ collapsed, setCollapsed }) => {
     logout();
     navigate("/login");
   };
-  
+
+  const apps = [
+    {
+      label: "DMS",
+      icon: <FileSearch className="w-6 h-6 text-[#4FC3F7]" />,
+      path: "https://dms.istreams-erp.com/",
+    },
+    {
+      label: "CRM",
+      icon: <BriefcaseBusiness className="w-6 h-6 text-[#81C784]" />,
+      path: "https://crm.istreams-erp.com/",
+    },
+    {
+      label: "Task Management",
+      icon: <CalendarCheck2 className="w-6 h-6 text-[#FFD54F]" />,
+      path: "https://task.istreams-erp.com/",
+    },
+  ];
+
   return (
-    <header className="relative z-10 flex p-3 items-center justify-between bg-white shadow-md transition-colors dark:bg-slate-900">
-      <div className="flex items-center gap-x-2">
+    <header className="sticky top-0 z-50 flex items-center justify-between px-3 py-2 bg-white shadow-sm dark:bg-slate-900">
+      {/* Left: Logo and Collapse */}
+      <div className="flex items-center gap-3">
         <Button
           variant="ghost"
+          size="icon"
+          className="h-9 w-9 p-0"
           onClick={() => setCollapsed(!collapsed)}
         >
-          <MenuIcon className={collapsed ? "rotate-180 " : ""} />
+          <PanelLeftClose
+            className={`h-5 w-5 transition-transform ${
+              collapsed ? "rotate-180" : ""
+            }`}
+          />
         </Button>
-        <Link to="/" className="hidden md:block text-sm font-semibold whitespace-nowrap cursor-pointer hover:text-gray-300">
-          iStreamsCloud
-        </Link>
+
+        <div className="hidden md:flex items-center gap-3">
+          <Link
+            to="/"
+            className="text-sm font-semibold whitespace-nowrap hover:text-primary transition-colors"
+          >
+            iStreams cloud
+          </Link>
+        </div>
       </div>
 
-      <nav className="flex items-center justify-end w-full">
-        <div className="flex items-center gap-2">
-          {/* <div className="border border-gray-700 px-2 py-2 rounded-lg text-sm font-semibold hidden lg:block">
-            {userData.organization}
-          </div> */}
+      {/* Right: Controls */}
+      <nav className="flex items-center gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9 relative"
+          onClick={toggleNotification}
+          title={showNotification ? "Hide notifications" : "Show notifications"}
+        >
+          {showNotification ? (
+            <Bell className="h-5 w-5" />
+          ) : (
+            <BellOff className="h-5 w-5 text-gray-400" />
+          )}
+        </Button>
 
-          {/* Notification Toggle Button */}
-          <Button
-            variant="ghost"
-            onClick={toggleNotification}
-            className="relative"
-            title={showNotification ? "Hide notifications" : "Show notifications"}
-          >
-            {showNotification ? (
-              <Bell className="h-5 w-5" />
-            ) : (
-              <BellOff className="h-5 w-5 text-gray-400" />
-            )}
-          </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9"
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          title="Toggle theme"
+        >
+          {theme === "dark" ? (
+            <CloudSun className="h-5 w-5" />
+          ) : (
+            <CloudMoon className="h-5 w-5" />
+          )}
+        </Button>
 
-          <Button
-            variant="ghost"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9 hidden md:flex"
+          onClick={toggleFullScreen}
+          title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+        >
+          {isFullscreen ? (
+            <Minimize className="h-5 w-5" />
+          ) : (
+            <Maximize className="h-5 w-5" />
+          )}
+        </Button>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-9 w-9">
+              <LayoutGrid className="w-5 h-5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            className="w-80 p-4 grid grid-cols-3 gap-4 rounded-xl"
+            align="end"
           >
-            {theme === "dark" ? (
-              <CloudSun />
-            ) : (
-              <CloudMoon />
-            )}
-          </Button>
-          <DropdownMenu >
-            <DropdownMenuTrigger className="flex items-start gap-2">
-              <Avatar>
-                <AvatarImage src={userData.userAvatar} alt={userData.userName} />
-                <AvatarFallback>{userData.userName}</AvatarFallback>
-              </Avatar>
-              <div className="flex flex-col items-start">
-                <span className="text-lg font-semibold leading-6">
-                  {userData.userName}
-                </span>
-                <span className="text-xs text-gray-400">
-                  {userData.userEmail}
+            {apps.map((app) => (
+              <div
+                key={app.label}
+                className="flex flex-col items-center justify-center text-center rounded-lg p-3 cursor-pointer transition-all duration-200 hover:bg-gray-100 dark:hover:bg-slate-800"
+                onClick={() => window.open(app.path, "_blank")}
+                title={app.label}
+              >
+                <div className="relative">{app.icon}</div>
+                <span className="text-xs font-medium mt-2 max-w-[72px] overflow-hidden text-ellipsis whitespace-nowrap">
+                  {app.label}
                 </span>
               </div>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-[250px]">
-              <DropdownMenuLabel className="flex flex-col justify-between items-start mb-2">
-                <p className="text-md font-medium">
-                  {userData.userName}
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger className="flex items-center gap-2 focus:outline-none">
+            <Avatar className="h-9 w-9">
+              <AvatarImage
+                src={userData?.userAvatar}
+                alt={userData?.userName}
+              />
+              <AvatarFallback>
+                {userData?.userName?.charAt(0) || "U"}
+              </AvatarFallback>
+            </Avatar>
+            <div className="hidden sm:flex flex-col items-start leading-tight">
+              <span className="text-sm font-medium truncate max-w-[120px]">
+                {userData?.userName}
+              </span>
+              <span className="text-xs text-muted-foreground truncate max-w-[150px]">
+                {userData?.userEmail}
+              </span>
+            </div>
+          </DropdownMenuTrigger>
+
+          <DropdownMenuContent className="w-64 mt-2" align="end">
+            <DropdownMenuLabel>
+              <div className="flex flex-col space-y-1">
+                <p className="text-sm font-medium truncate">
+                  {userData?.userName}
                 </p>
-                <p className="text-xs font-normal text-gray-400">
-                  {userData.userEmail}
+                <p className="text-xs text-muted-foreground truncate">
+                  {userData?.userEmail}
                 </p>
-              </DropdownMenuLabel>
-              <DropdownMenuGroup>
-          
-                <DropdownMenuItem onClick={handleLogout} className="text-red-600 flex justify-between items-center cursor-pointer">
-                  Log out <LogOut />
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-        {/* Conditionally render the Notification component */}
-        {showNotification && <Notification />}
+              </div>
+            </DropdownMenuLabel>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuGroup>
+              <DropdownMenuItem onClick={() => navigate("/profile")}>
+                Profile
+              </DropdownMenuItem>
+
+              <DropdownMenuItem onClick={() => navigate("/account-settings")}>
+                <div className="flex justify-between items-center w-full">
+                  Account Settings <Settings2 size={16} />
+                </div>
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator />
+
+              <DropdownMenuItem
+                onClick={handleLogout}
+                className="text-red-600 focus:text-red-700"
+              >
+                <div className="flex justify-between items-center w-full">
+                  Log out <LogOut size={16} />
+                </div>
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuItem className="p-0">
+              <Button className="w-full h-9 text-sm">Upgrade to Pro</Button>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Notification component */}
+        {showNotification && (
+          <Notification onClose={() => setShowNotification(false)} />
+        )}
       </nav>
     </header>
   );
-};
-
-Header.propTypes = {
-  collapsed: PropTypes.bool,
-  setCollapsed: PropTypes.func,
 };

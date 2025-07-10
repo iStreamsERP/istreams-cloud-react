@@ -53,16 +53,13 @@ const cleanResponse = (response, field) => {
   if (!cleaned) return null;
 
   switch (field) {
-    case "invoiceNo":
-  cleaned = cleaned.replace(/(invoice\s*number\s*is[:\-]?)\s*/i, "").trim();
-  // Updated pattern to match invoice numbers with slashes and alphanumeric segments
-  const invoicePattern = /\b([A-Z]{2,}\/[A-Z0-9]+\/[A-Z]+\/\d{4})\b/i;
-  const fullMatch = cleaned.match(invoicePattern);
-  if (fullMatch) return fullMatch[0];
-  // Fallback for other patterns
-  const numericMatch = cleaned.match(/\b\d{8,15}(?:\s*-\s*\d{1,3})?\b/);
-  if (numericMatch) return numericMatch[0].replace(/\s+/g, "");
-  return null;
+     case "invoiceNo":
+      // Remove common prefixes and extract alphanumeric invoice numbers
+      cleaned = cleaned.replace(/(invoice\s*number\s*is[:\-]?)\s*/i, "").trim();
+      // Match various invoice number formats
+      const invoicePattern = /\b([A-Z]{2,}\/[A-Z0-9]+\/[A-Z]+\/\d{4}|\d{4}-\d{4,6}|[A-Z]{2,3}-\d{4,6})\b/i;
+      const fullMatch = cleaned.match(invoicePattern);
+      return fullMatch ? fullMatch[0] : cleaned;
     case "invoiceDate":
     case "orderDate":
     case "paidOn":
@@ -123,7 +120,7 @@ const cleanResponse = (response, field) => {
   }
 };
 
-const UploadInvoice = ({ uploadedFiles, isUploadOpen, setIsUploadOpen, onExtractedData }) => {
+const UploadInvoice = ({ uploadedFiles, isUploadOpen, setIsUploadOpen, onExtractedData , resetTrigger }) => {
   const [previewFile, setPreviewFile] = useState(null);
   const [imageZoom, setImageZoom] = useState(1);
   const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
@@ -160,6 +157,17 @@ const UploadInvoice = ({ uploadedFiles, isUploadOpen, setIsUploadOpen, onExtract
       setPreviewFile(null);
     }
   }, [uploadedFiles, isUploadOpen]);
+
+  //   useEffect(() => {
+  //   // Reset extraction data when resetTrigger changes
+  //   resetExtractionData();
+  // }, [resetTrigger]);
+  useEffect(() => {
+  return () => {
+    // Clean up when component unmounts
+    resetExtractionData();
+  };
+}, []);
 
   const extractAllInformation = async () => {
     setIsLoading(true);

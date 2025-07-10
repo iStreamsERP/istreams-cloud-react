@@ -17,7 +17,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { convertServiceDate } from "@/utils/dateUtils";
 
-
 const InvoiceListPage = () => {
   const [tableList, setTableList] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -28,7 +27,7 @@ const InvoiceListPage = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const fetchInvoices = async () => { 
+  const fetchInvoices = async () => {
     setLoading(true);
     setError(null);
     try {
@@ -38,7 +37,11 @@ const InvoiceListPage = () => {
         Orderby: "REF_SERIAL_NO DESC",
       };
 
-      const response = await callSoapService(userData.clientURL, "DataModel_GetData", payload);
+      const response = await callSoapService(
+        userData.clientURL,
+        "DataModel_GetData",
+        payload
+      );
       setTableList(response);
     } catch (error) {
       setError(error?.message);
@@ -51,43 +54,58 @@ const InvoiceListPage = () => {
     fetchInvoices();
   }, [userData]);
 
-  const handleDelete = useCallback( async (invoice) => {
-    const result = window.confirm("Are you sure you want to delete this rfq? This action cannot be undone.");
-    if (!result) return;
+  const handleDelete = useCallback(
+    async (invoice) => {
+      const result = window.confirm(
+        "Are you sure you want to delete this rfq? This action cannot be undone."
+      );
+      if (!result) return;
 
-    try {
-      // Delete master records
+      try {
+        // Delete master records
         const payload = {
           DataModelName: "ACC_INVOICE_BOOKING",
           WhereCondition: `REF_SERIAL_NO = ${invoice.REF_SERIAL_NO}`,
         };
 
-        const response = await callSoapService(userData.clientURL, "DataModel_DeleteData", payload);
+        const response = await callSoapService(
+          userData.clientURL,
+          "DataModel_DeleteData",
+          payload
+        );
         if (response) {
-          setTableList((prev) => prev.filter((rfq) => invoice.REF_SERIAL_NO !== invoice.REF_SERIAL_NO));
+          setTableList((prev) =>
+            prev.filter(
+              (rfq) => invoice.REF_SERIAL_NO !== invoice.REF_SERIAL_NO
+            )
+          );
         }
 
-     toast({
+        toast({
           variant: "destructive",
           title: "rfq deleted successfully",
         });
-      
-      fetchInvoices();
-    } catch (error) {
-      toast({
+
+        fetchInvoices();
+      } catch (error) {
+        toast({
           variant: "destructive",
           title: error?.message || "Failed to delete rfq",
         });
-    }
-
-  }, [userData]);
+      }
+    },
+    [userData]
+  );
 
   const columns = [
     {
       id: "select",
       header: ({ table }) => (
         <Checkbox
-          checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && "indeterminate")}
+          checked={
+            table.getIsAllPageRowsSelected() ||
+            (table.getIsSomePageRowsSelected() && "indeterminate")
+          }
           onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
           aria-label="Select all"
         />
@@ -116,19 +134,27 @@ const InvoiceListPage = () => {
           </Button>
         );
       },
-      cell: ({ row }) => <div className="capitalize">{row.getValue("REF_SERIAL_NO") || "-"}</div>,
+      cell: ({ row }) => (
+        <div className="capitalize">{row.getValue("REF_SERIAL_NO") || "-"}</div>
+      ),
     },
     {
       accessorKey: "VENDOR_NAME",
       header: "Vendor Name",
       cell: ({ row }) => (
-        <div className="capitalize">{(row.getValue("VENDOR_NAME")) || row.getValue("VENDOR_NAME") || "-"}</div>
+        <div className="capitalize">
+          {row.getValue("VENDOR_NAME") || row.getValue("VENDOR_NAME") || "-"}
+        </div>
       ),
     },
     {
       accessorKey: "INVOICE_DATE",
       header: () => <div>Invoice Date</div>,
-      cell: ({ row }) => <div>{(convertServiceDate(row.getValue("INVOICE_DATE") || "-")) || "-"}</div>,
+      cell: ({ row }) => (
+        <div>
+          {convertServiceDate(row.getValue("INVOICE_DATE") || "-") || "-"}
+        </div>
+      ),
     },
     {
       accessorKey: "RECEIVED_DATE",
@@ -144,7 +170,13 @@ const InvoiceListPage = () => {
           </Button>
         );
       },
-      cell: ({ row }) => <div>{convertServiceDate(row.getValue("RECEIVED_DATE") || "-") || row.getValue("RECEIVED_DATE") || "-"}</div>,
+      cell: ({ row }) => (
+        <div>
+          {convertServiceDate(row.getValue("RECEIVED_DATE") || "-") ||
+            row.getValue("RECEIVED_DATE") ||
+            "-"}
+        </div>
+      ),
     },
     {
       accessorKey: "CURRENCY_NAME",
@@ -154,17 +186,19 @@ const InvoiceListPage = () => {
     {
       accessorKey: "INVOICE_AMOUNT",
       header: () => <div>Invoice Amount</div>,
-      cell: ({ row }) => <div>{  row.getValue("INVOICE_AMOUNT") || "-"}</div>,
+      cell: ({ row }) => <div>{row.getValue("INVOICE_AMOUNT") || "-"}</div>,
     },
-     {
+    {
       accessorKey: "EXCHANGE_RATE",
       header: () => <div>Exchange Rate</div>,
-      cell: ({ row }) => <div>{ row.getValue("EXCHANGE_RATE") || "-"}</div>,
+      cell: ({ row }) => <div>{row.getValue("EXCHANGE_RATE") || "-"}</div>,
     },
-       {
+    {
       accessorKey: "PAYMENT_DATE",
       header: () => <div> Payment Date</div>,
-      cell: ({ row }) => <div>{ convertServiceDate( row.getValue("PAYMENT_DATE")) || "-"}</div>,
+      cell: ({ row }) => (
+        <div>{convertServiceDate(row.getValue("PAYMENT_DATE")) || "-"}</div>
+      ),
     },
     {
       accessorKey: "USER_NAME",
@@ -180,10 +214,7 @@ const InvoiceListPage = () => {
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className="h-8 w-8 p-0"
-              >
+              <Button variant="ghost" className="h-8 w-8 p-0">
                 <span className="sr-only">Open menu</span>
                 <MoreHorizontal />
               </Button>
@@ -192,7 +223,9 @@ const InvoiceListPage = () => {
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => navigate(`/edit-invoice/${invoice.REF_SERIAL_NO}`)} // Navigate to rfq details
+                onClick={() =>
+                  navigate(`/edit-invoice/${invoice.REF_SERIAL_NO}`)
+                } // Navigate to rfq details
                 className="flex items-center gap-1"
               >
                 <Pencil /> Edit
@@ -217,7 +250,9 @@ const InvoiceListPage = () => {
       disabled={Object.keys(rowSelection).length === 0}
       onClick={() => {
         const selectedClientIds = Object.keys(rowSelection);
-        const selectedItems = tableList.filter((row) => selectedClientIds.includes(row.REF_SERIAL_NO.toString()));
+        const selectedItems = tableList.filter((row) =>
+          selectedClientIds.includes(row.REF_SERIAL_NO.toString())
+        );
         selectedItems.forEach((item) => handleDelete(item));
       }}
     >

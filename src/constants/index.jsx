@@ -1,4 +1,6 @@
 import {
+  BriefcaseBusiness,
+  CalendarCheck2,
   CalendarClock,
   ClipboardListIcon,
   FileCheck2,
@@ -55,6 +57,26 @@ export const getNavbarLinks = (isAdmin) => [
         label: "Invoice Booking",
         icon: NotebookPen,
         path: "/new-invoice",
+      },
+    ],
+  },
+  {
+    title: "SaaS Product",
+    links: [
+      {
+        label: "DMS",
+        icon: FileSearch,
+        path: "https://dms.istreams-erp.com/",
+      },
+      {
+        label: "CRM",
+        icon: BriefcaseBusiness,
+        path: "https://crm.istreams-erp.com/",
+      },
+      {
+        label: "Task Management",
+        icon: CalendarCheck2,
+        path: "https://task.istreams-erp.com/",
       },
     ],
   },

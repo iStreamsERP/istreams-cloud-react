@@ -41,6 +41,14 @@ const InvoiceChatbot = ({ isOpen, onClose, uploadedFiles, onExtractedData }) => 
 
   const cleanResponse = (response, field) => {
     if (response === null || response === undefined) return null;
+    
+    // Check if response contains "data not found" or similar
+    if (typeof response === "string" && 
+        (response.toLowerCase().includes("data not found") || 
+        response.toLowerCase().includes("not found") ||
+        response.trim() === "")) {
+      return null;
+    }
 
     let cleaned = typeof response === "string" ? response : JSON.stringify(response);
     cleaned = cleaned.trim();
@@ -53,22 +61,38 @@ const InvoiceChatbot = ({ isOpen, onClose, uploadedFiles, onExtractedData }) => 
         break;
       case "invoiceDate":
         try {
-          const date = new Date(cleaned);
-          if (!isNaN(date)) {
-            cleaned = date.toISOString().split("T")[0];
+          const dateMatch = cleaned.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+          if (dateMatch) {
+            const [, day, month, year] = dateMatch;
+            return `${year}-${month}-${day}`;
           }
+
+          const months = {
+            jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
+            jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
+          };
+
+          const altDateMatch = cleaned.match(/(\d{1,2})[-/](\w{3})[-/](\d{4})/i);
+          if (altDateMatch) {
+            const [, day, month, year] = altDateMatch;
+            return `${year}-${months[month.toLowerCase().substring(0, 3)]}-${day.padStart(2, "0")}`;
+          }
+
+          const date = new Date(cleaned);
+          return !isNaN(date) ? date.toISOString().split("T")[0] : null;
         } catch (e) {
-          // Keep original if date parsing fails
+          return null;
         }
-        break;
       case "invoiceAmount":
-        cleaned = cleaned.replace(/[^\d.-]/g, "");
+        cleaned = cleaned.replace(/[^\d.-]/g, ""); // Remove non-numeric characters
         break;
       case "invoiceCurrency":
-        cleaned = cleaned;
+        // Keep only currency code or symbol
+        cleaned = cleaned.replace(/[^A-Za-z$€£¥]/g, "").toUpperCase();
         break;
     }
-    return cleaned;
+    
+    return cleaned || null;
   };
 
   const extractAllInformation = async () => {
@@ -77,23 +101,23 @@ const InvoiceChatbot = ({ isOpen, onClose, uploadedFiles, onExtractedData }) => 
     try {
       const questionMap = [
         {
-          question: "what is the invoice number only extract the invoice no without anything else",
+          question: "Extract only the invoice number without any other text. If not found, return null.",
           field: "invoiceNumber",
         },
         {
-          question: "what is the invoice date only extract the invoice date without anything else",
+          question: "Extract only the invoice date in DD/MM/YYYY format without any other text. If not found, return null.",
           field: "invoiceDate",
         },
         {
-          question: "what is the supplier name only extract the supplier name without anything else",
+          question: "Extract only the supplier name without any other text. If not found, return null.",
           field: "supplierName",
         },
         {
-          question: "invoice currency name only extract the invoice currency name without anything else",
+          question: "Extract only the invoice currency code (like USD, EUR) without any other text. If not found, return null.",
           field: "invoiceCurrency",
         },
         {
-          question: "what is the invoice amount only extract the invoice amount without anything else",
+          question: "Extract only the invoice amount as a number without any currency symbols or other text. If not found, return null.",
           field: "invoiceAmount",
         },
       ];
@@ -111,10 +135,14 @@ const InvoiceChatbot = ({ isOpen, onClose, uploadedFiles, onExtractedData }) => 
           });
 
           const responseData = response?.data ?? null;
-          currentData = { ...currentData, [field]: cleanResponse(responseData, field) };
+          const cleanedData = cleanResponse(responseData, field);
+          
+          // Only update if we got valid data
+          if (cleanedData !== null) {
+            currentData = { ...currentData, [field]: cleanedData };
+          }
         } catch (err) {
           console.error(`Error processing ${field}:`, err);
-          currentData = { ...currentData, [field]: null };
         }
       }
 
@@ -141,7 +169,7 @@ const InvoiceChatbot = ({ isOpen, onClose, uploadedFiles, onExtractedData }) => 
         ...prev,
         {
           id: Date.now() + 1,
-          text: "Sorry, I encountered an error while analyzing the document. " + "Please try again or ask a specific question about the document.",
+          text: "Sorry, I encountered an error while analyzing the document. Please try again or ask a specific question about the document.",
           sender: "bot",
           timestamp: new Date(),
         },
@@ -178,6 +206,56 @@ const InvoiceChatbot = ({ isOpen, onClose, uploadedFiles, onExtractedData }) => 
       });
 
       const responseText = response?.data ? String(response.data) : "No response received";
+
+      // Check if the response contains any of our field data and update extractedData
+      const updatedData = { ...extractedData };
+      let shouldUpdate = false;
+
+      // Check for invoice number
+      if (inputMessage.toLowerCase().includes("invoice number")) {
+        const cleaned = cleanResponse(responseText, "invoiceNumber");
+        if (cleaned !== null) {
+          updatedData.invoiceNumber = cleaned;
+          shouldUpdate = true;
+        }
+      }
+      // Check for invoice date
+      else if (inputMessage.toLowerCase().includes("invoice date")) {
+        const cleaned = cleanResponse(responseText, "invoiceDate");
+        if (cleaned !== null) {
+          updatedData.invoiceDate = cleaned;
+          shouldUpdate = true;
+        }
+      }
+      // Check for supplier name
+      else if (inputMessage.toLowerCase().includes("supplier") || inputMessage.toLowerCase().includes("vendor")) {
+        const cleaned = cleanResponse(responseText, "supplierName");
+        if (cleaned !== null) {
+          updatedData.supplierName = cleaned;
+          shouldUpdate = true;
+        }
+      }
+      // Check for currency
+      else if (inputMessage.toLowerCase().includes("currency")) {
+        const cleaned = cleanResponse(responseText, "invoiceCurrency");
+        if (cleaned !== null) {
+          updatedData.invoiceCurrency = cleaned;
+          shouldUpdate = true;
+        }
+      }
+      // Check for amount
+      else if (inputMessage.toLowerCase().includes("amount") || inputMessage.toLowerCase().includes("total")) {
+        const cleaned = cleanResponse(responseText, "invoiceAmount");
+        if (cleaned !== null) {
+          updatedData.invoiceAmount = cleaned;
+          shouldUpdate = true;
+        }
+      }
+
+      if (shouldUpdate) {
+        setExtractedData(updatedData);
+        setShowApplyButton(true);
+      }
 
       setMessages((prev) => [
         ...prev,
@@ -235,7 +313,6 @@ const InvoiceChatbot = ({ isOpen, onClose, uploadedFiles, onExtractedData }) => 
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
-      
       <div
         className={`flex flex-col rounded-lg border border-gray-200 bg-white shadow-2xl transition-all duration-300 dark:border-gray-700 dark:bg-slate-900 ${
           isMinimized ? "h-12 w-72" : "h-[32rem] w-80 sm:w-96"
@@ -314,50 +391,47 @@ const InvoiceChatbot = ({ isOpen, onClose, uploadedFiles, onExtractedData }) => 
               ))}
 
               {showApplyButton && (
-                <div className="space-y-2  transition-all duration-300">
+                <div className="space-y-2 transition-all duration-300">
                   <div className="grid gap-2 mb-2">
-                    {extractedData.invoiceNumber && (
+                    {extractedData.invoiceNumber !== null && (
                       <Badge className="flex items-center justify-between bg-emerald-50 px-3 py-2 text-emerald-700 transition-all duration-200 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-300">
                         <div className="flex items-center gap-2">
-                        <p className="whitespace-pre-wrap p-1 rounded-full animate-pulse bg-blue-500"></p>
-                        <span>Invoice No: {extractedData.invoiceNumber}</span>
+                          <p className="whitespace-pre-wrap p-1 rounded-full animate-pulse bg-blue-500"></p>
+                          <span>Invoice No: {extractedData.invoiceNumber}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                    
                           <button 
                             onClick={() => handleRemoveDataItem('invoiceNumber')}
-                           className="text-red-600 hover:bg-red-400 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 rounded-full p-1"
+                            className="text-red-600 hover:bg-red-400 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 rounded-full p-1"
                           >
                             <XIcon className="h-3 w-3" />
                           </button>
                         </div>
                       </Badge>
                     )}
-                    {extractedData.invoiceDate && (
+                    {extractedData.invoiceDate !== null && (
                       <Badge className="flex items-center justify-between bg-emerald-50 px-3 py-2 text-emerald-700 transition-all duration-200 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-300">
                         <div className="flex items-center gap-2">
-                        <p className="whitespace-pre-wrap p-1 rounded-full animate-pulse bg-blue-500"></p>
-                        <span>Invoice Date: {extractedData.invoiceDate}</span>
+                          <p className="whitespace-pre-wrap p-1 rounded-full animate-pulse bg-blue-500"></p>
+                          <span>Invoice Date: {extractedData.invoiceDate}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                        
                           <button 
                             onClick={() => handleRemoveDataItem('invoiceDate')}
-                            className="text-red-600 hover:bg-red-400 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300  rounded-full p-1"
+                            className="text-red-600 hover:bg-red-400 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 rounded-full p-1"
                           >
                             <XIcon className="h-3 w-3" />
                           </button>
                         </div>
                       </Badge>
                     )}
-                    {extractedData.supplierName && (
+                    {extractedData.supplierName !== null && (
                       <Badge className="flex items-center justify-between bg-emerald-50 px-3 py-2 text-emerald-700 transition-all duration-200 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-300">
                         <div className="flex items-center gap-2">
-                        <p className="whitespace-pre-wrap p-1 rounded-full animate-pulse bg-blue-500"></p>
-                        <span>Supplier: {extractedData.supplierName}</span>
-                      </div>
+                          <p className="whitespace-pre-wrap p-1 rounded-full animate-pulse bg-blue-500"></p>
+                          <span>Supplier: {extractedData.supplierName}</span>
+                        </div>
                         <div className="flex items-center gap-1">
-                       
                           <button 
                             onClick={() => handleRemoveDataItem('supplierName')}
                             className="text-red-600 hover:bg-red-400 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 rounded-full p-1"
@@ -367,34 +441,32 @@ const InvoiceChatbot = ({ isOpen, onClose, uploadedFiles, onExtractedData }) => 
                         </div>
                       </Badge>
                     )}
-                    {extractedData.invoiceCurrency && (
+                    {extractedData.invoiceCurrency !== null && (
                       <Badge className="flex items-center justify-between bg-emerald-50 px-3 py-2 text-emerald-700 transition-all duration-200 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-300">
                         <div className="flex items-center gap-2">
-                        <p className="whitespace-pre-wrap p-1 rounded-full animate-pulse bg-blue-500"></p>
-                        <span>Currency: {extractedData.invoiceCurrency}</span>
+                          <p className="whitespace-pre-wrap p-1 rounded-full animate-pulse bg-blue-500"></p>
+                          <span>Currency: {extractedData.invoiceCurrency}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                     
                           <button 
                             onClick={() => handleRemoveDataItem('invoiceCurrency')}
-                           className="text-red-600 hover:bg-red-400 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300  rounded-full p-1"
+                            className="text-red-600 hover:bg-red-400 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 rounded-full p-1"
                           >
                             <XIcon className="h-3 w-3" />
                           </button>
                         </div>
                       </Badge>
                     )}
-                    {extractedData.invoiceAmount && (
+                    {extractedData.invoiceAmount !== null && (
                       <Badge className="flex items-center justify-between bg-emerald-50 px-3 py-2 text-emerald-700 transition-all duration-200 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-300">
                         <div className="flex items-center gap-2">
-                        <p className="whitespace-pre-wrap p-1 rounded-full animate-pulse bg-blue-500"></p>
-                        <span>Amount: {extractedData.invoiceAmount}</span>
+                          <p className="whitespace-pre-wrap p-1 rounded-full animate-pulse bg-blue-500"></p>
+                          <span>Amount: {extractedData.invoiceAmount}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                         
                           <button 
                             onClick={() => handleRemoveDataItem('invoiceAmount')}
-                            className="text-red-600 hover:bg-red-400 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300  rounded-full p-1"
+                            className="text-red-600 hover:bg-red-400 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 rounded-full p-1"
                           >
                             <XIcon className="h-3 w-3" />
                           </button>
@@ -404,10 +476,9 @@ const InvoiceChatbot = ({ isOpen, onClose, uploadedFiles, onExtractedData }) => 
                   </div>
                   <button
                     onClick={handleApplyToForm}
-                    className="w-full  rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 px-4 py-2.5 text-sm font-medium text-white flex items-center justify-center gap-2 shadow-md transition-all duration-400 hover:shadow-lg hover:shadow-blue-500/20 focus:outline-none focus:ring-2  focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 dark:focus:ring-offset-gray-900"
+                    className="w-full rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 px-4 py-2.5 text-sm font-medium text-white flex items-center justify-center gap-2 shadow-md transition-all duration-400 hover:shadow-lg hover:shadow-blue-500/20 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 dark:focus:ring-offset-gray-900"
                   >
                     <p className="whitespace-pre-wrap animate-pulse">Apply to Form</p>
-                    
                   </button>
                 </div>
               )}

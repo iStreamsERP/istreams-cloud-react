@@ -73,46 +73,49 @@ const DashboardPage = () => {
     chartType: chartNo === 2 ? "donut" : "bar",
   });
 
-  const renderEventCard = () => (
-    <Card className="shadow-xl bg-white dark:bg-slate-950 border rounded-xl">
-      <CardHeader className="p-4">
-        <CardTitle className="text-xl font-bold tracking-wide">Upcoming Event</CardTitle>
-      </CardHeader>
-      <CardContent className="p-3 ms-2 h-[55vh] overflow-y-auto">
-        {eventData.length === 0 ? (
-          <div className="text-center text-lg py-8">No upcoming events.</div>
-        ) : (
-          <div className="relative">
-            <div className="absolute border border-dashed top-0 left-24 w-0.5 h-full bg-blue-100 dark:bg-blue-900" />
-            <div className="space-y-4 whitespace-nowrap ml-28">
-              {eventData.map((ev, idx) => {
-                const eventDate = new Date(ev.EVENT_DATE);
-                const formattedDate = eventDate.toLocaleDateString("en-GB", {
-                  day: "2-digit",
-                  month: "short",
-                  year: "numeric",
-                  weekday: "short",
-                });
-                return (
-                  <div key={idx} className="relative">
-                    <div className="absolute -left-28 top-0 text-[10px] font-semibold">{formattedDate}</div>
-                    <div className="absolute -left-[22.5px] top-2 w-4 h-4 bg-blue-900 border-4 border-white rounded-full animate-pulse shadow-md" />
-                    <div className="bg-blue-100 hover:bg-blue-200 w-full text-gray-800 p-2 rounded-lg shadow-lg dark:text-gray-200 dark:bg-gray-800">
-                      <h3 className="text-lg font-semibold">{ev.EVENT_NAME}</h3>
-                      <div className="font-semibold">
-                        {ev.EVENT_DESCRIPTION}
-                        <p className="text-[11px] text-gray-500">{ev.EVENT_INFO}</p>
-                      </div>
+ const renderEventCard = (item) => (
+  <Card className="shadow-xl bg-white dark:bg-slate-950 border rounded-xl">
+    <CardHeader className="p-4">
+      <CardTitle className="text-lg font-bold tracking-wide">
+        {item.UPCOMING_EVENT_HEADER || "Upcoming Events"}
+      </CardTitle>
+    </CardHeader>
+    <CardContent className="p-3 ms-2 h-[55vh] overflow-y-auto">
+      {eventData.length === 0 ? (
+        <div className="text-center text-lg py-8">No upcoming events.</div>
+      ) : (
+        <div className="relative">
+          <div className="absolute border border-dashed top-0 left-24 w-0.5 h-full bg-blue-100 dark:bg-blue-900" />
+          <div className="space-y-4 whitespace-nowrap ml-28">
+            {eventData.map((ev, idx) => {
+              const eventDate = new Date(ev.EVENT_DATE);
+              const formattedDate = eventDate.toLocaleDateString("en-GB", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+                weekday: "short",
+              });
+              return (
+                <div key={idx} className="relative">
+                  <div className="absolute -left-28 top-0 text-[10px] font-semibold">{formattedDate}</div>
+                  <div className="absolute -left-[22.5px] top-2 w-4 h-4 bg-blue-900 border-4 border-white rounded-full animate-pulse shadow-md" />
+                  <div className="bg-blue-100 hover:bg-blue-200 w-full text-gray-800 p-2 rounded-lg shadow-lg dark:text-gray-200 dark:bg-gray-800">
+                    <h3 className="text-lg font-semibold">{ev.EVENT_NAME}</h3>
+                    <div className="font-semibold">
+                      {ev.EVENT_DESCRIPTION}
+                      <p className="text-[11px] text-gray-500">{ev.EVENT_INFO}</p>
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              );
+            })}
           </div>
-        )}
-      </CardContent>
-    </Card>
-  );
+        </div>
+      )}
+    </CardContent>
+  </Card>
+);
+
 
   if (loading) {
     return (
@@ -174,7 +177,7 @@ const DashboardPage = () => {
                     onChange={(e) => setSelectedLayout(Number(e.target.value))}
                     className="px-2 py-1  rounded-md  dark:bg-slate-900 text-gray-800 dark:text-white"
                   >
-                    {[1, 2, 3, 4, 5, 6].map((num) => (
+                    {[1, 2, 3, 4].map((num) => (
                       <option key={num} value={num}>
                       {num}
                       </option>
@@ -252,7 +255,7 @@ const DashboardPage = () => {
               <GrossSalaryChart {...chartProps(item, 1)} />
               <div className="grid lg:grid-cols-2 gap-3">
                 <GrossSalaryChart {...chartProps(item, 2)} />
-                {renderEventCard()}
+                {renderEventCard(item)}
               </div>
               <GrossSalaryChart {...chartProps(item, 3)} />
             </>
@@ -267,7 +270,7 @@ const DashboardPage = () => {
               </div>
               <div className="grid lg:grid-cols-2 gap-3">
                 <GrossSalaryChart {...chartProps(item, 3)} />
-                {renderEventCard()}
+                {renderEventCard(item)}
               </div>
             </>
           )}
@@ -277,7 +280,7 @@ const DashboardPage = () => {
             <>
               <div className="grid lg:grid-cols-2 gap-3">
                 <GrossSalaryChart {...chartProps(item, 1)} />
-                {renderEventCard()}
+                {renderEventCard(item)}
               </div>
               <div className="grid lg:grid-cols-2 gap-3">
                 <GrossSalaryChart {...chartProps(item, 2)} />
@@ -292,7 +295,7 @@ const DashboardPage = () => {
               <GrossSalaryChart {...chartProps(item, 1)} />
               <GrossSalaryChart {...chartProps(item, 2)} />
               <GrossSalaryChart {...chartProps(item, 3)} />
-              {renderEventCard()}
+              {renderEventCard(item)}
             </>
           )}
 
@@ -353,7 +356,7 @@ const DashboardPage = () => {
               </div>
               <div className="grid lg:grid-cols-2 gap-3">
                 <GrossSalaryChart {...chartProps(item, 2)} />
-                {renderEventCard()}
+                {renderEventCard(item)}
               </div>
               <GrossSalaryChart {...chartProps(item, 3)} />
             </>
@@ -416,7 +419,7 @@ const DashboardPage = () => {
 
                 {/* Right: Event card full height */}
                 <div className="h-full">
-                  {renderEventCard()}
+                  {renderEventCard(item)}
                 </div>
               </div>
 

@@ -692,7 +692,7 @@ const formatValue = (value, fieldName = '') => {
 
   const isINR = userData.companyCurrIsIndianStandard === false;
 
-  // ✅ REMOVE currency symbol here
+
   switch (displayFormat) {
     case "K":
       return isINR
@@ -2519,7 +2519,7 @@ return (
   
           </div>
           
-                           <Dialog open={isChartPreview} onOpenChange={setIsChartPreview}>
+                           {/* <Dialog open={isChartPreview} onOpenChange={setIsChartPreview}>
                    <TooltipProvider>
               <FormateTooltip>
                   <TooltipTrigger asChild>
@@ -2532,7 +2532,7 @@ return (
               >
                 <Eye className="h-4 w-4 mr-1" />
               
-                 {/* <Table className="w-4 h-4" /> */}
+                 <Table className="w-4 h-4" />
               </Button>
              
             </DialogTrigger>
@@ -2546,7 +2546,7 @@ return (
            <ChartPreview />
             </DialogContent>
             
-          </Dialog>
+          </Dialog> */}
           
          
     <Button

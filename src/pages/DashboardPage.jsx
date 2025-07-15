@@ -229,16 +229,26 @@ const DashboardPage = () => {
                       <CardContent className="px-6 pb-3 pt-1">
                        
                         <div className="flex items-center justify-between pt-0">
-                         <div className="text-lg font-bold">
-                          {showAnimatedNumbers ? (
-                            <AnimatedNumber
-                              value={item[`BADGE${badgeNum}_VALUE`]}
-                              generateRandomValue={generateRandomValue}
-                            />
-                          ) : (
-                            item[`BADGE${badgeNum}_VALUE`] || "N/A"
-                          )}
-                        </div>
+                       <div className="text-lg font-bold">
+  {showAnimatedNumbers ? (
+    <AnimatedNumber
+      value={item[`BADGE${badgeNum}_VALUE`]}
+      generateRandomValue={generateRandomValue}
+    />
+  ) : (
+    (() => {
+      const val = item[`BADGE${badgeNum}_VALUE`];
+      if (!val) return "N/A";
+
+      const valStr = String(val);
+      const isDecimal = valStr.includes(".") && !isNaN(Number(valStr));
+      const currencySymbol = userData?.companyCurrSymbol || "$";
+
+      return isDecimal ? `${currencySymbol}${valStr}` : valStr;
+    })()
+  )}
+</div>
+
                           <ArrowRight className={`h-4 w-4 ${textColor} mr-1`} />
                         </div>
                       </CardContent>

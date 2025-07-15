@@ -80,23 +80,23 @@ export function GrossSalaryChart({ DashBoardID, ChartNo, chartTitle ,chartType: 
 
   const navigate = useNavigate()
   const currencySymbol = userData?.companyCurrSymbol || "$"
-// const handlePreviewClick = () => {
-//   const chartData = {
-//     DashBoardID,
-//     ChartNo,
-//     chartTitle: customTitle || chartTitle,
-//     chartXAxis,
-//     chartYAxis,
+const handlePreviewClick = () => {
+  const chartData = {
+    DashBoardID,
+    ChartNo,
+    chartTitle: customTitle || chartTitle,
+    chartXAxis,
+    chartYAxis,
     
 
-//   };
+  };
 
-//   // Store in sessionStorage
-//   sessionStorage.setItem("chartPreviewData", JSON.stringify(chartData));
+  // Store in sessionStorage
+  sessionStorage.setItem("chartPreviewData", JSON.stringify(chartData));
 
-//   // Open new tab
-//   window.open("/chart-preview", "_blank");
-// };
+  // Open new tab
+  window.open("/chart-preview", "_blank");
+};
 
 
   const formatFieldName = (fieldName) => {
@@ -2518,36 +2518,26 @@ return (
                
   
           </div>
-          
-                           {/* <Dialog open={isChartPreview} onOpenChange={setIsChartPreview}>
-                   <TooltipProvider>
-              <FormateTooltip>
-                  <TooltipTrigger asChild>
-            <DialogTrigger asChild>
-               
-              <Button 
-                variant="outline" 
-                size="sm"
-                className="bg-gradient-to-r from-blue-50 to-green-50 dark:from-blue-900 dark:to-green-900"
-              >
-                <Eye className="h-4 w-4 mr-1" />
-              
-                 <Table className="w-4 h-4" />
-              </Button>
-             
-            </DialogTrigger>
-          </TooltipTrigger>
-                  <TooltipContent>
-                    <p> chart preview</p>
-                  </TooltipContent>
-              </FormateTooltip>
-              </TooltipProvider>
-            <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
-           <ChartPreview />
-            </DialogContent>
-            
-          </Dialog> */}
-          
+{/*           
+         <Dialog open={isChartPreview} onOpenChange={setIsChartPreview}>
+  <DialogTrigger asChild>
+    <Button 
+      variant="outline" 
+      size="sm"
+      className="bg-gradient-to-r from-blue-50 to-green-50 dark:from-blue-900 dark:to-green-900"
+        onClick={() => handlePreviewClick()}
+    >
+      <Eye className="h-4 w-4 mr-1" />
+    </Button>
+  </DialogTrigger>
+
+  <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
+    
+    <ChartPreview  DashBoardID ChartNo  customTitle chartXAxis chartYAxis />
+
+  </DialogContent>
+</Dialog> */}
+
          
     <Button
       variant="outline"

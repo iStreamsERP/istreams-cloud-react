@@ -313,11 +313,11 @@ const InvoiceChatbot = ({ isOpen, onClose, uploadedFiles, onExtractedData }) => 
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
-      <div
-        className={`flex flex-col rounded-lg border border-gray-200 bg-white shadow-2xl transition-all duration-300 dark:border-gray-700 dark:bg-slate-900 ${
-          isMinimized ? "h-12 w-72" : "h-[32rem] w-80 sm:w-96"
-        }`}
-      >
+       <div
+    className={`flex flex-col rounded-lg border border-gray-200 bg-white shadow-2xl transition-all duration-300 dark:border-gray-700 dark:bg-slate-900 ${
+      isMinimized ? "h-12 w-72 " : "lg:h-[32rem] h-[28rem] w-[18rem]  sm:w-96"
+    }`}
+  >
         <div className="flex items-center justify-between rounded-t-lg bg-gradient-to-r from-blue-500 to-purple-600 p-4 text-white">
           <div className="flex items-center space-x-2">
             <div className="h-3 w-3 animate-pulse rounded-full bg-green-400"></div>

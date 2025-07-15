@@ -11,200 +11,13 @@ import VendorComponent from "../components/rfq/VendorComponent";
 
 import { convertServiceDate } from "@/utils/dateUtils";
 import MaterialComponent from "@/components/rfq/MaterialComponent";
-// Static data for raw materials
-const RAW_MATERIALS = [
-  {
-    ITEM_CODE: "RM-001",
-    DESCRIPTION: "Stainless Steel Sheet 304",
-    UOM: "KG",
-    SPECIFICATION: "2mm thickness, 4x8 feet",
-    SUGGESTED_VENDOR_ID: "V-001",
-    SUGGESTED_VENDOR_NAME: "Metal Suppliers Inc.",
-    SUGGESTED_RATE: 120,
-  },
-  {
-    ITEM_CODE: "RM-002",
-    DESCRIPTION: "Aluminum Extrusion",
-    UOM: "M",
-    SPECIFICATION: "6063-T5, 25x25mm",
-    SUGGESTED_VENDOR_ID: "V-002",
-    SUGGESTED_VENDOR_NAME: "Alumex Corp",
-    SUGGESTED_RATE: 85,
-  },
-  {
-    ITEM_CODE: "RM-003",
-    DESCRIPTION: "Mild Steel Plate",
-    UOM: "KG",
-    SPECIFICATION: "10mm thickness, A36 grade",
-    SUGGESTED_VENDOR_ID: "V-003",
-    SUGGESTED_VENDOR_NAME: "Steel World",
-    SUGGESTED_RATE: 65,
-  },
-  {
-    ITEM_CODE: "RM-004",
-    DESCRIPTION: "Copper Wire",
-    UOM: "M",
-    SPECIFICATION: "2.5mm diameter, annealed",
-    SUGGESTED_VENDOR_ID: "V-004",
-    SUGGESTED_VENDOR_NAME: "Wire Solutions",
-    SUGGESTED_RATE: 320,
-  },
-  {
-    ITEM_CODE: "RM-005",
-    DESCRIPTION: "PVC Pipes",
-    UOM: "M",
-    SPECIFICATION: "50mm diameter, Schedule 40",
-    SUGGESTED_VENDOR_ID: "V-005",
-    SUGGESTED_VENDOR_NAME: "Plastic Products Ltd",
-    SUGGESTED_RATE: 45,
-  },
-  {
-    ITEM_CODE: "RM-006",
-    DESCRIPTION: "Rubber Gaskets",
-    UOM: "PCS",
-    SPECIFICATION: "50mm ID, 5mm thickness",
-    SUGGESTED_VENDOR_ID: "V-006",
-    SUGGESTED_VENDOR_NAME: "Rubber Tech",
-    SUGGESTED_RATE: 12,
-  },
-  {
-    ITEM_CODE: "RM-007",
-    DESCRIPTION: "Brass Fittings",
-    UOM: "PCS",
-    SPECIFICATION: "1/2 inch NPT",
-    SUGGESTED_VENDOR_ID: "V-007",
-    SUGGESTED_VENDOR_NAME: "Fittings World",
-    SUGGESTED_RATE: 28,
-  },
-  {
-    ITEM_CODE: "RM-008",
-    DESCRIPTION: "Ceramic Insulators",
-    UOM: "PCS",
-    SPECIFICATION: "High voltage, 10kV rating",
-    SUGGESTED_VENDOR_ID: "V-008",
-    SUGGESTED_VENDOR_NAME: "Electro Ceramics",
-    SUGGESTED_RATE: 150,
-  },
-  {
-    ITEM_CODE: "RM-009",
-    DESCRIPTION: "Fiberglass Cloth",
-    UOM: "M",
-    SPECIFICATION: "200gsm, plain weave",
-    SUGGESTED_VENDOR_ID: "V-009",
-    SUGGESTED_VENDOR_NAME: "Composite Materials",
-    SUGGESTED_RATE: 95,
-  },
-  {
-    ITEM_CODE: "RM-010",
-    DESCRIPTION: "Epoxy Resin",
-    UOM: "KG",
-    SPECIFICATION: "Fast cure, industrial grade",
-    SUGGESTED_VENDOR_ID: "V-010",
-    SUGGESTED_VENDOR_NAME: "Chemicals Plus",
-    SUGGESTED_RATE: 180,
-  },
-];
-
-// Static data for purchase requisition items
-const PURCHASE_ITEMS = [
-  {
-    ITEM_CODE: "PR-001",
-    DESCRIPTION: "Industrial Air Compressor",
-    UOM: "PCS",
-    SPECIFICATION: "10HP, 100PSI, 20CFM",
-    SUGGESTED_VENDOR_ID: "V-011",
-    SUGGESTED_VENDOR_NAME: "Air Systems Inc.",
-    SUGGESTED_RATE: 25000,
-  },
-  {
-    ITEM_CODE: "PR-002",
-    DESCRIPTION: "CNC Lathe Machine",
-    UOM: "PCS",
-    SPECIFICATION: "1000mm bed, 15kW",
-    SUGGESTED_VENDOR_ID: "V-012",
-    SUGGESTED_VENDOR_NAME: "Machine Tools Co.",
-    SUGGESTED_RATE: 450000,
-  },
-  {
-    ITEM_CODE: "PR-003",
-    DESCRIPTION: "Hydraulic Press",
-    UOM: "PCS",
-    SPECIFICATION: "50 ton capacity",
-    SUGGESTED_VENDOR_ID: "V-013",
-    SUGGESTED_VENDOR_NAME: "Heavy Equipment Ltd",
-    SUGGESTED_RATE: 120000,
-  },
-  {
-    ITEM_CODE: "PR-004",
-    DESCRIPTION: "Industrial Chiller",
-    UOM: "PCS",
-    SPECIFICATION: "10 ton cooling capacity",
-    SUGGESTED_VENDOR_ID: "V-014",
-    SUGGESTED_VENDOR_NAME: "Cooling Systems",
-    SUGGESTED_RATE: 85000,
-  },
-  {
-    ITEM_CODE: "PR-005",
-    DESCRIPTION: "Forklift",
-    UOM: "PCS",
-    SPECIFICATION: "2.5 ton capacity, diesel",
-    SUGGESTED_VENDOR_ID: "V-015",
-    SUGGESTED_VENDOR_NAME: "Material Handling",
-    SUGGESTED_RATE: 180000,
-  },
-  {
-    ITEM_CODE: "PR-006",
-    DESCRIPTION: "Welding Machine",
-    UOM: "PCS",
-    SPECIFICATION: "MIG/ARC, 400A",
-    SUGGESTED_VENDOR_ID: "V-016",
-    SUGGESTED_VENDOR_NAME: "Welding Solutions",
-    SUGGESTED_RATE: 32000,
-  },
-  {
-    ITEM_CODE: "PR-007",
-    DESCRIPTION: "Industrial Dehumidifier",
-    UOM: "PCS",
-    SPECIFICATION: "100 pints/day",
-    SUGGESTED_VENDOR_ID: "V-017",
-    SUGGESTED_VENDOR_NAME: "Climate Control",
-    SUGGESTED_RATE: 28000,
-  },
-  {
-    ITEM_CODE: "PR-008",
-    DESCRIPTION: "Dust Collector",
-    UOM: "PCS",
-    SPECIFICATION: "2000 CFM, bag filter",
-    SUGGESTED_VENDOR_ID: "V-018",
-    SUGGESTED_VENDOR_NAME: "Clean Air Systems",
-    SUGGESTED_RATE: 45000,
-  },
-  {
-    ITEM_CODE: "PR-009",
-    DESCRIPTION: "Overhead Crane",
-    UOM: "PCS",
-    SPECIFICATION: "5 ton capacity, 10m span",
-    SUGGESTED_VENDOR_ID: "V-019",
-    SUGGESTED_VENDOR_NAME: "Lifting Equipment",
-    SUGGESTED_RATE: 320000,
-  },
-  {
-    ITEM_CODE: "PR-010",
-    DESCRIPTION: "Industrial Oven",
-    UOM: "PCS",
-    SPECIFICATION: "500L capacity, 300°C max",
-    SUGGESTED_VENDOR_ID: "V-020",
-    SUGGESTED_VENDOR_NAME: "Thermal Systems",
-    SUGGESTED_RATE: 75000,
-  },
-];
 
 export default function RfqPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { userData } = useAuth();
   const { toast } = useToast();
-  console.log(id, "ID from params");
+  // console.log(id, "ID from params");
   const initialMaterial = {
     COMPANY_CODE: 1,
     BRANCH_CODE: 1,
@@ -212,8 +25,8 @@ export default function RfqPage() {
     QUOTATION_REF_DATE: new Date().toISOString().split("T")[0],
     SERIAL_NO: 1,
     ITEM_CODE: "",
-    DESCRIPTION: "",
-    UOM: "",
+    ITEM_NAME: "",
+    UOM_STOCK: "",
     QTY: 1,
     RECEIVED_STATUS: false,
     CLOSED_STATUS: false,
@@ -291,6 +104,8 @@ export default function RfqPage() {
   const [vendorSearch, setVendorSearch] = useState("");
   const [materialFormData, setMaterialFormData] = useState(initialMaterial);
   const [materials, setMaterials] = useState([]);
+  const [rawMaterials, setRawMaterials] = useState([]);
+  const [purchaseRequitions, setPurchaseRequisitions] = useState([]);
   const [vendorFormData, setVendorFormData] = useState(initialVendor);
   const [editingQuantityId, setEditingQuantityId] = useState(null);
   const [selectedMaterial, setSelectedMaterial] = useState(null);
@@ -308,6 +123,11 @@ export default function RfqPage() {
       fetchQuotationData(id);
     }
   }, [id]);
+
+  useEffect(() => {
+    fetchRawMaterials();
+    fetchPurchaseRequisitions();
+  }, [userData]);
 
   const fetchVendors = async () => {
     try {
@@ -331,6 +151,52 @@ export default function RfqPage() {
     }
   };
 
+  const fetchRawMaterials = async () => {
+    try {
+      const payload = {
+        DataModelName: "INVT_MATERIAL_MASTER_VIEW",
+        WhereCondition: "",
+        Orderby: "",
+      };
+      const response = await callSoapService(
+        userData.clientURL,
+        "DataModel_GetData",
+        payload
+      );
+      setRawMaterials(response);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Failed to fetch raw materials",
+        description: error.message,
+      });
+    }
+  };
+  // console.log(" rawMaterials", rawMaterials);
+
+  const fetchPurchaseRequisitions = async () => {
+    try {
+      const payload = {
+        DataModelName: "INVT_PO_REQUISITIONLIST",
+        WhereCondition: "",
+        Orderby: "",
+      };
+      const response = await callSoapService(
+        userData.clientURL,
+        "DataModel_GetData",
+        payload
+      );
+      setPurchaseRequisitions(response);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Failed to fetch purchase requisitions",
+        description: error.message,
+      });
+    }
+  };
+
+  // console.log(" purchaseRequitions", purchaseRequitions);
   const fetchQuotationData = async (quotationId) => {
     setLoading(true);
     try {
@@ -348,23 +214,15 @@ export default function RfqPage() {
 
       if (masterResponse.length > 0) {
         const masterData = masterResponse[0];
-        // const formatDate = (dateString) => {
-        //   if (!dateString) return new Date().toISOString().split("T")[0];
-        //   if (dateString.includes("/Date(")) {
-        //     const match = dateString.match(/\/Date\((\d+)\)\//);
-        //     if (match) {
-        //       return new Date(parseInt(match[1], 10)).toISOString().split("T")[0];
-        //     }
-        //   }
-        //   return dateString.split("T")[0];
-        // };
-
         setMaterialFormData({
           ...masterData,
           QUOTATION_REF_DATE: convertServiceDate(masterData.QUOTATION_REF_DATE),
           EXPECTED_DATE: convertServiceDate(masterData.EXPECTED_DATE),
           QUOTATION_FOR: masterData.QUOTATION_FOR || "Raw",
           SPECIFICATION: masterData.SPECIFICATION || "",
+          SUB_MATERIAL_NO: masterData.SUB_MATERIAL_NO || null,
+          ITEM_NAME: masterData.DESCRIPTION || "",
+          UOM_STOCK: masterData.UOM || masterData.UOM_STOCK || "",
         });
 
         const detailsPayload = {
@@ -378,12 +236,9 @@ export default function RfqPage() {
           "DataModel_GetData",
           detailsPayload
         );
+
+        // Pass the master data to processEditData to get the SUB_MATERIAL_NO
         processEditData(masterResponse, detailsResponse);
-        console.log(
-          "Quotation data loaded successfully",
-          masterResponse,
-          detailsResponse
-        );
       }
     } catch (error) {
       toast({
@@ -400,18 +255,38 @@ export default function RfqPage() {
     const materialsMap = new Map();
     const vendorsMap = new Map();
 
+    // Create a map of master data by ITEM_CODE for easy lookup
+    const masterDataMap = {};
+    masterData.forEach((master) => {
+      masterDataMap[master.ITEM_CODE] = master;
+    });
+
     detailsData.forEach((detail) => {
+      const masterItem = masterDataMap[detail.ITEM_CODE] || {};
+
       if (!materialsMap.has(detail.ITEM_CODE)) {
         materialsMap.set(detail.ITEM_CODE, {
           ITEM_CODE: detail.ITEM_CODE,
-          DESCRIPTION: detail.DESCRIPTION,
-          UOM: detail.UOM,
+          ITEM_NAME:
+            detail.DESCRIPTION ||
+            detail.ITEM_NAME ||
+            masterItem.ITEM_NAME ||
+            "",
+          UOM_STOCK:
+            detail.UOM ||
+            detail.UOM_STOCK ||
+            masterItem.UOM ||
+            masterItem.UOM_STOCK ||
+            "Kg", // Added proper UOM handling
+          DESCRIPTION: detail.DESCRIPTION || "",
+          UOM: detail.UOM || masterItem.UOM || "",
           QTY: detail.QTY,
-          SPECIFICATION: detail.SPECIFICATION,
+          SPECIFICATION: detail.SPECIFICATION || "",
           SUGGESTED_VENDOR_ID: detail.VENDOR_ID,
           SUGGESTED_VENDOR_NAME: detail.VENDOR_NAME,
           SUGGESTED_RATE: detail.RATE,
           SERIAL_NO: detail.QUOTATION_SERIAL_NO,
+          SUB_MATERIAL_NO: masterItem.SUB_MATERIAL_NO || null,
         });
       }
 
@@ -431,12 +306,15 @@ export default function RfqPage() {
       if (vendor) {
         vendor.materials.push({
           ITEM_CODE: detail.ITEM_CODE,
-          DESCRIPTION: detail.DESCRIPTION,
-          UOM: detail.UOM,
+          ITEM_NAME: detail.DESCRIPTION || detail.ITEM_NAME || "",
+          DESCRIPTION: detail.DESCRIPTION || "",
+          UOM_STOCK: detail.UOM || detail.UOM_STOCK || "",
+          UOM: detail.UOM || "",
           QTY: detail.QTY,
           RATE: detail.RATE,
           DISCOUNT_RATE: detail.DISCOUNT_RATE,
           EXPECTED_DATE: detail.EXPECTED_DATE,
+          SUB_MATERIAL_NO: detail.SUB_MATERIAL_NO || null,
         });
       }
     });
@@ -445,8 +323,6 @@ export default function RfqPage() {
     setSelectedVendors(Array.from(vendorsMap.values()));
     setNextMaterialSerialNo(materialsMap.size + 1);
     setNextVendorSerialNo(vendorsMap.size + 1);
-
-    console.log("Processed edit data", { materialsMap, vendorsMap });
   };
 
   const handleChange = (e) => {
@@ -484,6 +360,8 @@ export default function RfqPage() {
 
     const newMaterial = {
       ...material,
+      ITEM_NAME: material.ITEM_NAME || material.DESCRIPTION || "", // Ensure name is populated
+      DESCRIPTION: material.DESCRIPTION || material.ITEM_NAME || "", // Map both ways
       QTY: 1,
       SERIAL_NO: nextMaterialSerialNo,
       QUOTATION_REF_NO: materialFormData.QUOTATION_REF_NO,
@@ -518,7 +396,7 @@ export default function RfqPage() {
   const handleRemoveMaterial = (itemCode) => {
     try {
       if (isEditMode && id) {
-        console.log(`Removing material ${itemCode} from quotation ${id}`);
+        // console.log(`Removing material ${itemCode} from quotation ${id}`);
 
         const payload = {
           UserName: userData.userName,
@@ -881,10 +759,10 @@ export default function RfqPage() {
           USER_NAME: userData.username,
           ENT_DATE: new Date().toISOString().split("T")[0],
           ITEM_CODE: material.ITEM_CODE,
-          DESCRIPTION: material.DESCRIPTION,
+          DESCRIPTION: material.ITEM_NAME,
           SERIAL_NO: materialSerialNo,
           QTY: material.QTY,
-          UOM: material.UOM,
+          UOM: material.UOM_STOCK,
           EXPECTED_DATE: material.EXPECTED_DATE,
           SPECIFICATION: material.SPECIFICATION,
           SUGGESTED_VENDOR_ID: material.SUGGESTED_VENDOR_ID,
@@ -894,6 +772,7 @@ export default function RfqPage() {
           SELECTED_VENDOR_NAME: vendor.VENDOR_NAME,
           SELECTED_RATE: vendorMaterial.RATE || material.SUGGESTED_RATE,
           QUOTATION_REF_NO: refno,
+          SUB_MATERIAL_NO: material.SUB_MATERIAL_NO,
         };
 
         const convertedMaterialData = convertDataModelToStringData(
@@ -930,7 +809,7 @@ export default function RfqPage() {
           VENDOR_ID: vendor.VENDOR_ID,
           VENDOR_NAME: vendor.VENDOR_NAME,
           ITEM_CODE: material.ITEM_CODE,
-          DESCRIPTION: material.DESCRIPTION,
+          DESCRIPTION: material.ITEM_NAME,
           UOM: material.UOM,
           QTY: material.QTY,
           COUNTRY_NAME: vendor.COUNTRY_NAME,
@@ -956,6 +835,7 @@ export default function RfqPage() {
           "DataModel_SaveData",
           vendorPayload
         );
+        console.log("Response for vendor:", res);
 
         materialSerialNo++;
       }
@@ -970,7 +850,7 @@ export default function RfqPage() {
     try {
       // Step 1: Delete all existing records for this quotation
       if (isEditMode && refno !== -1) {
-        console.log("Deleting existing records for quotation:", refno);
+        // console.log("Deleting existing records for quotation:", refno);
 
         // Delete quotation details first (child records)
         const deleteDetailsPayload = {
@@ -1012,9 +892,9 @@ export default function RfqPage() {
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
 
-      console.log("Starting to create new records");
-      console.log("Materials:", materials);
-      console.log("Selected Vendors:", selectedVendors);
+      // console.log("Starting to create new records");
+      // console.log("Materials:", materials);
+      // console.log("Selected Vendors:", selectedVendors);
 
       // Step 2: Create new records with current data
       const processedCombinations = new Set(); // Track processed combinations to avoid duplicates
@@ -1042,10 +922,11 @@ export default function RfqPage() {
             USER_NAME: userData.userName || userData.username,
             ENT_DATE: new Date().toISOString().split("T")[0],
             ITEM_CODE: material.ITEM_CODE,
-            DESCRIPTION: material.DESCRIPTION,
+            DESCRIPTION: material.ITEM_NAME,
             SERIAL_NO: materialSerialNo,
             QTY: material.QTY,
-            UOM: material.UOM,
+            UOM: material.UOM_STOCK,
+            SUB_MATERIAL_NO: material.SUB_MATERIAL_NO,
             EXPECTED_DATE:
               material.EXPECTED_DATE || materialFormData.EXPECTED_DATE,
             SPECIFICATION:
@@ -1157,8 +1038,8 @@ export default function RfqPage() {
               setOpenMaterialPopup={setOpenMaterialPopup}
               materialSearch={materialSearch}
               setMaterialSearch={setMaterialSearch}
-              RAW_MATERIALS={RAW_MATERIALS}
-              PURCHASE_ITEMS={PURCHASE_ITEMS}
+              rawMaterials={rawMaterials} // Changed from RAW_MATERIALS
+              purchaseRequitions={purchaseRequitions} // Changed from PURCHASE_ITEMS
             />
           </div>
 

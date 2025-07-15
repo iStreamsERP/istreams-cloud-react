@@ -26,7 +26,7 @@ export const getNavbarLinks = (isAdmin) => [
           title: "MAIN",
           links: [
             {
-              label: "Dashboard",
+              label: "Dashboards",
               icon: Home,
               children: [
                 {

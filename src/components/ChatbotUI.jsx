@@ -53,7 +53,7 @@ const ChatbotUI = () => {
         setMessages([
           {
             id: Date.now(),
-            text: `How can I help you about "${context.chartTitle}" datas?`,
+            text: `How can I help you about "${context.chartTitle}" data?`,
             sender: "bot",
             timestamp: new Date()
           }
@@ -141,7 +141,7 @@ const ChatbotUI = () => {
             setMessages([
               {
                 id: Date.now(),
-                text: `How can I help you about "${context.chartTitle}" datas?`,
+                text: `How can I help you about "${context.chartTitle}" data?`,
                 sender: "bot",
                 timestamp: new Date(),
               },

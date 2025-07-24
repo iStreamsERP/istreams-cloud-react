@@ -13,7 +13,7 @@ import { convertServiceDate } from "@/utils/dateUtils";
 import MaterialComponent from "@/components/rfq/MaterialComponent";
 
 export default function RfqPage() {
-  const { id } = useParams();
+  const { id } = useParams(); // Get the id from the URL
   const navigate = useNavigate();
   const { userData } = useAuth();
   const { toast } = useToast();

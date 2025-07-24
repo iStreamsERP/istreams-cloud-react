@@ -1938,6 +1938,7 @@ case "stackedDonut":
  
 
 return (
+  <div>
  <Card className="w-full bg-white dark:bg-slate-950 border shadow-sm">
         <CardHeader className="p-2 sm:px-4 sm:py-1">
     {/* Top row: Title and Controls */}
@@ -3069,5 +3070,7 @@ return (
       </CardContent>
 
     </Card>
+    {/* <ChatbotUI /> */}
+    </div>
 )
 }

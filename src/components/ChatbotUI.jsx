@@ -1,9 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Minimize2 ,Sparkles} from 'lucide-react';
+import { MessageCircle, X, Send, Minimize2, Sparkles } from 'lucide-react';
 import { callSoapService } from '@/api/callSoapService';
 import { useAuth } from '@/contexts/AuthContext';
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import axios from 'axios';
-
+import ChartPreview from './iStCharts/ChartPreview';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 const ChatbotUI = () => {
   const { userData } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
@@ -19,8 +22,10 @@ const ChatbotUI = () => {
   const [chartContext, setChartContext] = useState(null);
   const [inputMessage, setInputMessage] = useState('');
   const [chartData, setChartData] = useState(null);
+  const [latestChartData, setLatestChartData] = useState(null); // Track latest AI data
   const [isLoading, setIsLoading] = useState(true);
   const messagesEndRef = useRef(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -53,13 +58,18 @@ const ChatbotUI = () => {
         setMessages([
           {
             id: Date.now(),
-            text: `How can I help you about "${context.chartTitle}" data?`,
+            text: `How can I help you about "${context.badgeTitle || context.chartTitle || context.UPCOMING_EVENT_HEADER}" data?`,
             sender: "bot",
             timestamp: new Date()
           }
         ]);
 
-        fetchChartData(context.DashBoardID, context.ChartNo);
+        if (context.source === "chart") {
+          fetchChartData(context.DashBoardID, context.ChartNo);
+        } else if (context.source === "badge" || context.source === "events") {
+          setChartData(context.data);
+          setIsLoading(false);
+        }
       }
     };
 
@@ -103,11 +113,15 @@ const ChatbotUI = () => {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
+      const aiResponse = response.data;
+
       setMessages(prev =>
         prev.map(msg =>
-          msg.id === loadingMsgId ? { ...msg, text: response.data } : msg
+          msg.id === loadingMsgId ? { ...msg, text: aiResponse } : msg
         )
       );
+
+      setLatestChartData(aiResponse); // Save latest AI response for chart preview
     } catch (err) {
       setMessages(prev =>
         prev.map(msg =>
@@ -127,6 +141,9 @@ const ChatbotUI = () => {
 
   const minimizeChat = () => setIsMinimized(true);
   const restoreChat = () => setIsMinimized(false);
+
+  const markdown = `
+  | Department Name | |----------------------| | Setting Out | | Finance | | General | | Projects | | Production | | IT | | HR | | Estimation | | Administration | | Purchase | | Maintenance | | Store | | Cleaning |`
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
@@ -167,9 +184,7 @@ const ChatbotUI = () => {
       )}
 
       {isOpen && (
-        <div className={`flex flex-col bg-white rounded-lg shadow-2xl border border-gray-200 transition-all duration-300 dark:bg-slate-900 ${
-          isMinimized ? 'w-72 h-12' : 'w-80 h-96 sm:w-96 sm:h-[500px]'
-        }`}>
+        <div className={`flex flex-col bg-white rounded-lg shadow-2xl border border-gray-200 transition-all duration-300 dark:bg-slate-900 ${isMinimized ? 'w-72 h-12' : 'w-80 h-96 sm:w-96 sm:h-[500px]'}`}>
           <div className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-t-lg">
             <div className="flex items-center space-x-2">
               <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
@@ -187,18 +202,39 @@ const ChatbotUI = () => {
 
           {!isMinimized && (
             <>
-              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50 dark:bg-slate-900">
+              <div className="flex-1 overflow-y-auto  p-4 space-y-3 bg-gray-50 dark:bg-slate-900">
                 {messages.map((message) => (
-                  <div key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-xs px-3 py-2 rounded-lg text-sm ${
-                      message.sender === 'user'
-                        ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-br-sm'
-                        : 'bg-white text-gray-800 shadow-sm border border-gray-200 rounded-bl-sm'
-                    }`}>
-                      <p>{message.text}</p>
+                  <div key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'} `}>
+                    <div className={`max-w-xs px-3 py-2 overflow-x-auto rounded-lg text-sm ${message.sender === 'user' ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-br-sm' : 'bg-white text-gray-800 shadow-sm border border-gray-200 rounded-bl-sm'}`}>
+                      <p ><ReactMarkdown remarkPlugins={[remarkGfm]}>
+        {message.text}
+      </ReactMarkdown> </p>
                       <span className={`text-xs mt-1 block ${message.sender === 'user' ? 'text-blue-100' : 'text-gray-500'}`}>
                         {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
+
+                      {/* Chart Preview Button */}
+                  {message.sender === 'bot' &&
+                  message.id === messages[messages.length - 1].id &&
+                  latestChartData && (
+                    <div className="mt-2 text-right">
+                      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+                        <DialogTrigger asChild>
+                          <button
+                            onClick={() => setIsPreviewOpen(true)}
+                            className="mt-2 text-xs px-3 py-1 rounded-full bg-blue-500 text-white hover:bg-blue-600"
+                          >
+                            Chart Preview
+                          </button>
+                        </DialogTrigger>
+
+                        <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
+                          <ChartPreview data={latestChartData} />
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  )}
+
                     </div>
                   </div>
                 ))}

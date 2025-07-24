@@ -1,12 +1,38 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { ChevronsUpDown, Trash2Icon, Users } from "lucide-react";
 
 export default function VendorComponent({
@@ -31,15 +57,14 @@ export default function VendorComponent({
     <Card className="h-[68vh] w-full overflow-hidden bg-white shadow-lg dark:bg-slate-950">
       <CardHeader className="border-b px-4 py-[10px]">
         <div className="flex items-center justify-between space-x-4">
-          <CardTitle className="whitespace-nowrap text-base font-semibold">Vendor Selection</CardTitle>
+          <CardTitle className="whitespace-nowrap text-base font-semibold">
+            Vendor Selection
+          </CardTitle>
         </div>
       </CardHeader>
       <CardContent className="flex h-[calc(75vh-80px)] flex-col overflow-hidden p-4 pt-2">
         <div className="flex-shrink-0 space-y-2">
-          <Popover
-            open={vendorOpen}
-            onOpenChange={setVendorOpen}
-          >
+          <Popover open={vendorOpen} onOpenChange={setVendorOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
@@ -47,7 +72,9 @@ export default function VendorComponent({
                 className="h-8 w-full justify-between truncate bg-white text-xs dark:bg-slate-950"
                 disabled={materials.length === 0}
               >
-                {selectedVendors.length > 0 ? selectedVendors[selectedVendors.length - 1].VENDOR_NAME : "Select a vendor"}
+                {selectedVendors.length > 0
+                  ? selectedVendors[selectedVendors.length - 1].VENDOR_NAME
+                  : "Select a vendor"}
                 <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
               </Button>
             </PopoverTrigger>
@@ -65,10 +92,18 @@ export default function VendorComponent({
                     {vendors
                       .filter((vendor) => {
                         const search = vendorSearch.toLowerCase();
-                        const vendorName = vendor.VENDOR_NAME ? vendor.VENDOR_NAME.toLowerCase() : "";
-                        const countryName = vendor.COUNTRY_NAME ? vendor.COUNTRY_NAME.toLowerCase() : "";
+                        const vendorName = vendor.VENDOR_NAME
+                          ? vendor.VENDOR_NAME.toLowerCase()
+                          : "";
+                        const countryName = vendor.COUNTRY_NAME
+                          ? vendor.COUNTRY_NAME.toLowerCase()
+                          : "";
 
-                        return vendorName.includes(search) || countryName.includes(search) || vendor.VENDOR_ID.toString().includes(search);
+                        return (
+                          vendorName.includes(search) ||
+                          countryName.includes(search) ||
+                          vendor.VENDOR_ID.toString().includes(search)
+                        );
                       })
                       .map((vendor) => (
                         <CommandItem
@@ -81,7 +116,9 @@ export default function VendorComponent({
                             <div className="font-sm">{vendor.VENDOR_NAME}</div>
                             <div className="flex items-center gap-3 text-xs">
                               <p> {vendor.COUNTRY_NAME}</p>
-                              <Badge variant={"secondary"}>{vendor.VENDOR_ID}</Badge>
+                              <Badge variant={"secondary"}>
+                                {vendor.VENDOR_ID}
+                              </Badge>
                             </div>
                           </div>
                         </CommandItem>
@@ -102,7 +139,9 @@ export default function VendorComponent({
                   className="flex items-center justify-between rounded-md border p-2"
                 >
                   <div>
-                    <div className="text-xs font-medium">{vendor.VENDOR_NAME}</div>
+                    <div className="text-xs font-medium">
+                      {vendor.VENDOR_NAME}
+                    </div>
                     <div className="mt-1 text-xs text-gray-500">
                       {vendor.COUNTRY_NAME}
                       {" , "}
@@ -114,14 +153,15 @@ export default function VendorComponent({
                       variant={"secondary"}
                       onClick={() => handleBadgeClick(vendor)}
                     >
-                      {vendor.materials?.length || 0} {vendor.materials?.length === 1 ? "Item" : "Items"}
+                      {vendor.materials?.length || 0}{" "}
+                      {vendor.materials?.length === 1 ? "Item" : "Items"}
                     </Badge>
 
                     <Button
                       variant="ghost"
                       size="sm"
                       type="button"
-                      onClick={(e) => handleRemoveVendor(vendor.VENDOR_ID,e)}
+                      onClick={(e) => handleRemoveVendor(vendor.VENDOR_ID, e)}
                       className="rounded-full p-2 hover:bg-red-100 dark:hover:bg-red-800"
                     >
                       <Trash2Icon className="h-3 w-3 text-red-500" />
@@ -134,19 +174,24 @@ export default function VendorComponent({
             <div className="py-12 text-center text-gray-500">
               <Users className="mx-auto mb-3 h-12 w-12 opacity-50" />
               <p className="font-medium">No vendors selected</p>
-              <p className="text-sm">{materials.length === 0 ? "Select materials first" : "Select vendors to proceed with quotation"}</p>
+              <p className="text-sm">
+                {materials.length === 0
+                  ? "Select materials first"
+                  : "Select vendors to proceed with quotation"}
+              </p>
             </div>
           )}
         </div>
 
-        <Dialog
-          open={openVendorPopup}
-          onOpenChange={setOpenVendorPopup}
-        >
+        <Dialog open={openVendorPopup} onOpenChange={setOpenVendorPopup}>
           <DialogContent className="sm:max-w-[625px]">
             <DialogHeader>
-              <DialogTitle>Vendor Details - {selectedVendorForPopup?.VENDOR_NAME}</DialogTitle>
-              <DialogDescription>Materials assigned to this vendor</DialogDescription>
+              <DialogTitle>
+                Vendor Details - {selectedVendorForPopup?.VENDOR_NAME}
+              </DialogTitle>
+              <DialogDescription>
+                Materials assigned to this vendor
+              </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4">
               <Table>
@@ -165,12 +210,27 @@ export default function VendorComponent({
                   {selectedVendorForPopup?.materials?.length > 0 ? (
                     selectedVendorForPopup.materials.map((m, index) => (
                       <TableRow key={m.ITEM_CODE}>
-                        <TableCell className="text-center">{index + 1}</TableCell>
+                        <TableCell className="text-center">
+                          {index + 1}
+                        </TableCell>
                         <TableCell>{m.ITEM_CODE}</TableCell>
-                        <TableCell>{m.DESCRIPTION}</TableCell>
-                        <TableCell className="text-right">{m.UOM}</TableCell>
+                        <TableCell>
+                          {m.ITEM_NAME ||
+                            m.DESCRIPTION ||
+                            m.ITEM_DESCRIPTION ||
+                            "-"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {m.UOM || m.UOM_STOCK || "-"}
+                        </TableCell>
                         <TableCell className="text-right">{m.QTY}</TableCell>
-                        <TableCell className="text-right">{m.SUGGESTED_RATE ? m.SUGGESTED_RATE.toFixed(2) : "0.00"}</TableCell>
+                        <TableCell className="text-right">
+                          {m.SUGGESTED_RATE
+                            ? m.SUGGESTED_RATE.toFixed(2)
+                            : m.RATE
+                            ? m.RATE.toFixed(2)
+                            : "0.00"}
+                        </TableCell>
                         <TableCell className="text-right">
                           <Button
                             variant="ghost"

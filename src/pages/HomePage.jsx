@@ -15,7 +15,7 @@ import { ArrowLeft, TrendingDown, TrendingUp } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { callSoapService } from "@/api/callSoapService";
-
+import ChatbotUI from "@/components/ChatbotUI";
 const HomePage = () => {
   const { userData } = useAuth();
   const [tasks, setTasks] = useState([]);
@@ -535,6 +535,7 @@ const HomePage = () => {
           </div>
         </div>
       </div>
+      <ChatbotUI />
     </div >
   );
 };

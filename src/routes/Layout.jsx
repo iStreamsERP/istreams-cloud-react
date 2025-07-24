@@ -45,7 +45,7 @@ const Layout = () => {
           <Toaster />
         </main>
       </div>
-      <ChatbotUI />
+      {/* <ChatbotUI /> */}
     </div>
   );
 };

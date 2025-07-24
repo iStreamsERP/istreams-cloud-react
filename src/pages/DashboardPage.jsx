@@ -18,6 +18,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { CalendarDays, ArrowRight } from "lucide-react";
 import { callSoapService } from "@/api/callSoapService";
+import ChatbotUI from "@/components/ChatbotUI";
 
 const AnimatedNumber = ({ value, generateRandomValue }) => {
   const [displayValue, setDisplayValue] = useState(generateRandomValue());
@@ -57,6 +58,11 @@ const DashboardPage = () => {
       ]);
       setDbData(master);
       setEventData(event);
+      localStorage.setItem("chatbot_context", JSON.stringify({
+      source: "events",
+      title: item.UPCOMING_EVENT_HEADER || "Upcoming Events",
+      data: event,
+}));
     } catch (error) {
       console.error("Failed to fetch dashboard data", error);
     } finally {
@@ -230,24 +236,24 @@ const DashboardPage = () => {
                        
                         <div className="flex items-center justify-between pt-0">
                        <div className="text-lg font-bold">
-  {showAnimatedNumbers ? (
-    <AnimatedNumber
-      value={item[`BADGE${badgeNum}_VALUE`]}
-      generateRandomValue={generateRandomValue}
-    />
-  ) : (
-    (() => {
-      const val = item[`BADGE${badgeNum}_VALUE`];
-      if (!val) return "N/A";
+                            {showAnimatedNumbers ? (
+                              <AnimatedNumber
+                                value={item[`BADGE${badgeNum}_VALUE`]}
+                                generateRandomValue={generateRandomValue}
+                              />
+                            ) : (
+                              (() => {
+                                const val = item[`BADGE${badgeNum}_VALUE`];
+                                if (!val) return "N/A";
 
-      const valStr = String(val);
-      const isDecimal = valStr.includes(".") && !isNaN(Number(valStr));
-      const currencySymbol = userData?.companyCurrSymbol || "$";
+                                const valStr = String(val);
+                                const isDecimal = valStr.includes(".") && !isNaN(Number(valStr));
+                                const currencySymbol = userData?.companyCurrSymbol || "$";
 
-      return isDecimal ? `${currencySymbol}${valStr}` : valStr;
-    })()
-  )}
-</div>
+                                return isDecimal ? `${currencySymbol}${valStr}` : valStr;
+                              })()
+                            )}
+                          </div>
 
                           <ArrowRight className={`h-4 w-4 ${textColor} mr-1`} />
                         </div>
@@ -445,7 +451,9 @@ const DashboardPage = () => {
           
         </div>
       ))}
+          <ChatbotUI />
     </div>
+
   );
 };
 

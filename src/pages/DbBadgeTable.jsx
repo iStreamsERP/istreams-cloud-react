@@ -49,7 +49,7 @@ import {
 } from "@/components/ui/table";
 import { ArrowLeft, Download, Filter, Printer, Search, X, ChevronDown } from "lucide-react";
 import { callSoapService } from "@/api/callSoapService";
-
+import ChatbotUI from "@/components/ChatbotUI";
 const DbBadgeTable = () => {
   const { DashBoardID, BadgeNo } = useParams();
   const location = useLocation();
@@ -167,7 +167,14 @@ const DbBadgeTable = () => {
       };
   
       const master = await callSoapService(userData.clientURL, "BI_GetDashboard_BadgeDetails_Data", payload);
-      
+     localStorage.setItem("chatbot_context", JSON.stringify({
+      DashBoardID,
+      BadgeNo,
+      badgeTitle: badgeTitle || "Dashboard Badge Data",
+      source: "badge", // add a source flag to identify it in ChatbotUI
+      data: master
+    }));
+ 
       setDbData(master);
       setFilteredData(master);
     } catch (error) {
@@ -1286,6 +1293,7 @@ const ExcelFilter = ({ column }) => {
           </div>
         </CardFooter>
       </Card>
+      <ChatbotUI />
     </div>
   );
 };

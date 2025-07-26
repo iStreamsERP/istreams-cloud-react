@@ -142,8 +142,6 @@ const ChatbotUI = () => {
   const minimizeChat = () => setIsMinimized(true);
   const restoreChat = () => setIsMinimized(false);
 
-  const markdown = `
-  | Department Name | |----------------------| | Setting Out | | Finance | | General | | Projects | | Production | | IT | | HR | | Estimation | | Administration | | Purchase | | Maintenance | | Store | | Cleaning |`
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
@@ -220,16 +218,16 @@ const ChatbotUI = () => {
                     <div className="mt-2 text-right">
                       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
                         <DialogTrigger asChild>
-                          <button
+                          {/* <button
                             onClick={() => setIsPreviewOpen(true)}
                             className="mt-2 text-xs px-3 py-1 rounded-full bg-blue-500 text-white hover:bg-blue-600"
                           >
                             Chart Preview
-                          </button>
+                          </button> */}
                         </DialogTrigger>
 
                         <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
-                          <ChartPreview data={latestChartData} />
+                          <ChartPreview data={message.text} />
                         </DialogContent>
                       </Dialog>
                     </div>

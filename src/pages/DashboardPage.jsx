@@ -58,6 +58,11 @@ const DashboardPage = () => {
       ]);
       setDbData(master);
       setEventData(event);
+      
+ if (master.length > 0) {
+      const layout = Number(master[0].DEFAULT_LAYOUT);
+      setSelectedLayout(layout && layout > 0 ? layout : 1);
+    }
       localStorage.setItem("chatbot_context", JSON.stringify({
       source: "events",
       title: item.UPCOMING_EVENT_HEADER || "Upcoming Events",

@@ -111,96 +111,27 @@
 
 // pages/ChartPreview.jsx
 import React, { useEffect, useState } from 'react';
+import { parseMarkdownToJson } from '@/utils/parseMarkdownToJson';// 👈 adjust the path
 
-const ChartPreview = ({  data}) => {
-  const [header, setHeader] = useState("Item");
-  const [tableData, setTableData] = useState([]);
-
-  const extractFromDepartmentSummary = (text) => {
-    const output = [];
-
-    // Try to detect dynamic header like "Department-wise"
-    const headerMatch = text.match(/###\s*(.+?)\s*Summary/i);
-    const dynamicHeader = headerMatch ? headerMatch[1].trim() : "Item";
-    setHeader(dynamicHeader);
-
-    // Split by department entries: - **Department Name**
-    const sections = text.split(/-\s+\*\*(.+?)\*\*/g); // ["", dept1, body1, dept2, body2,...]
-
-    for (let i = 1; i < sections.length; i += 2) {
-      const departmentName = sections[i].trim();
-      const body = sections[i + 1];
-
-      const lines = body.split('\n').filter(Boolean);
-      const item = { [dynamicHeader]: departmentName };
-
-      lines.forEach((line) => {
-        const match = line.match(/-\s*(.+?):\s*(.+)/);
-        if (match) {
-          const key = match[1].trim();
-          const value = match[2].trim();
-          item[key] = value;
-        }
-      });
-
-      output.push(item);
-    }
-
-    return output;
-  };
+const ChartPreview = ({ data }) => {
+  const [jsonData, setJsonData] = useState([]);
 
   useEffect(() => {
-    if (data && typeof data === 'string') {
-      try {
-        const parsed = extractFromDepartmentSummary(data);
-        setTableData(parsed);
-      } catch (err) {
-        console.error("Error parsing data:", err);
-      }
-    }
+    const parsed = parseMarkdownToJson(data);
+    setJsonData(parsed);
   }, [data]);
 
-  const renderTable = () => {
-    if (tableData.length === 0) {
-      return <p>No data available.</p>;
-    }
-
-    const allKeys = new Set();
-    tableData.forEach(row => Object.keys(row).forEach(k => allKeys.add(k)));
-    const headers = Array.from(allKeys);
-
-    return (
-      <div className="overflow-x-auto p-4">
-        <table className="min-w-full text-sm text-left border border-collapse border-gray-300">
-          <thead className="bg-gray-100">
-            <tr>
-              {headers.map((header) => (
-                <th key={header} className="px-4 py-2 border border-gray-300">{header}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {tableData.map((row, idx) => (
-              <tr key={idx} className="even:bg-gray-50">
-                {headers.map((key) => (
-                  <td key={key} className="px-4 py-2 border border-gray-300">
-                    {row[key] || ""}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
-  };
-
   return (
-    <div className="bg-white text-gray-800 p-4">
-      <h1 className="text-xl font-semibold mb-4">Chart Data Preview</h1>
-      {renderTable()}
+    <div className="p-4 space-y-4">
+      <div className="bg-gray-100 p-3 rounded shadow">
+        <h3 className="font-semibold mb-2">AI Explanation (JSON)</h3>
+        <pre className="bg-white p-2 rounded text-sm overflow-auto">
+          {JSON.stringify(jsonData, null, 2)}
+        </pre>
+      </div>
     </div>
   );
 };
 
 export default ChartPreview;
+

@@ -984,6 +984,7 @@ const formatYAxisTick = (value) => {
               ? String(value).substring(0, 15) + "..." 
               : String(value)
           }
+    
         }
 
     const yAxisProps = chartType === "horizontalBar"
@@ -1014,6 +1015,7 @@ const formatYAxisTick = (value) => {
           <BarChart {...commonProps} barGap={barGap}>
             <XAxis {...xAxisProps} />
             <YAxis {...yAxisProps} />
+            
             {showTooltip && <Tooltip content={<CustomTooltip />} />}
             
             {selectedYAxes.length > 1 && showLegend && (
@@ -1034,7 +1036,9 @@ const formatYAxisTick = (value) => {
                 radius={barRadius}
                 name={formatFieldName(field)}
                 onClick={handleBarClick}
-                style={{ cursor: 'pointer' }}
+                style={{ cursor: 'pointer'}}
+            
+            
               >
                 {showDataLabels && (
                   <LabelList

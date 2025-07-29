@@ -166,7 +166,9 @@ const DbBadgeTable = () => {
         BadgeNo: parseInt(BadgeNo),
       };
   
-      const master = await callSoapService(userData.clientURL, "BI_GetDashboard_BadgeDetails_Data", payload);
+     const rawData = await callSoapService(userData.clientURL, "BI_GetDashboard_BadgeDetails_Data", payload);
+const master = formatAllDatesInObject(rawData);
+
      localStorage.setItem("chatbot_context", JSON.stringify({
       DashBoardID,
       BadgeNo,
@@ -236,6 +238,40 @@ const isNumericColumn = (key) => {
           year: 'numeric'
         }).replace(/ /g, '-');
   };
+const formatAllDatesInObject = (data) => {
+  const regex = /\/Date\((\d+)\)\//;
+
+  const formatDateString = (str) => {
+    const match = str.match(regex);
+    if (match) {
+      const timestamp = parseInt(match[1], 10);
+      const date = new Date(timestamp);
+      return date.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }).replace(/ /g, " ");
+    }
+    return str;
+  };
+
+  const traverse = (obj) => {
+    if (Array.isArray(obj)) {
+      return obj.map(traverse);
+    } else if (obj && typeof obj === "object") {
+      const newObj = {};
+      for (const key in obj) {
+        newObj[key] = traverse(obj[key]);
+      }
+      return newObj;
+    } else if (typeof obj === "string") {
+      return formatDateString(obj);
+    }
+    return obj;
+  };
+
+  return traverse(data);
+};
 
   const formatHeader = (key) => {
     return key

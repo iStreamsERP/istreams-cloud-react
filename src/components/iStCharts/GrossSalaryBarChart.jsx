@@ -38,19 +38,20 @@ export function GrossSalaryChart({ DashBoardID, ChartNo, chartTitle ,chartType: 
   // Enhanced chart options
   const [showDataLabels, setShowDataLabels] = useState(true)
   const [dataLabelPosition, setDataLabelPosition] = useState("top") // top, inside, outside, center
-  const [chartHeight, setChartHeight] = useState(450)
+  const [chartHeight, setChartHeight] = useState(420)
   const [barRadius, setBarRadius] = useState(4)
   const [showGrid, setShowGrid] = useState(false)
   const [colorScheme, setColorScheme] = useState("default")
   const [showLegend, setShowLegend] = useState(true)
   const [legendPosition, setLegendPosition] = useState("bottom")
   const [barGap, setBarGap] = useState(4)
-  const [fontSize, setFontSize] = useState(11)
+  const [fontSize, setFontSize] = useState(10)
   const [showTooltip, setShowTooltip] = useState(true)
   const [sortOrder, setSortOrder] = useState("none") // none, asc, desc
-  const [legendFontSize, setLegendFontSize] = useState(14)
-  const [maxBarsToShow, setMaxBarsToShow] = useState(50)
+  const [legendFontSize, setLegendFontSize] = useState(12)
+  const [maxBarsToShow, setMaxBarsToShow] = useState()
   const [customTitle, setCustomTitle] = useState(chartTitle)
+  
 
   // Line/Area chart specific options
   const [strokeWidth, setStrokeWidth] = useState(2)
@@ -77,6 +78,11 @@ export function GrossSalaryChart({ DashBoardID, ChartNo, chartTitle ,chartType: 
   const [isChartPreview, setIsChartPreview] = useState(false);
 
   const [showSummary, setShowSummary] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 25;
+
+
 
   const navigate = useNavigate()
   const currencySymbol = userData?.companyCurrSymbol || "$"
@@ -209,21 +215,22 @@ const handleMouseDown = (type) => (e) => {
 
 const handleMouseMove = useCallback((e) => {
   if (!isDragging.min && !isDragging.max) return;
-  
+
   const newValue = getValueFromPosition(e.clientX);
-  
+
   if (isDragging.min) {
     const maxAllowed = rangeMax - (dataMax - dataMin) * 0.01;
     const adjustedValue = Math.max(dataMin, Math.min(newValue, maxAllowed));
-   setRangeMin(Math.floor(adjustedValue));
+    setRangeMin(Math.floor(adjustedValue));
   }
-  
+
   if (isDragging.max) {
     const minAllowed = rangeMin + (dataMax - dataMin) * 0.01;
     const adjustedValue = Math.min(dataMax, Math.max(newValue, minAllowed));
     setRangeMax(Math.floor(adjustedValue));
   }
 }, [isDragging, rangeMin, rangeMax, dataMin, dataMax, getValueFromPosition]);
+
 
 const handleMouseUp = useCallback(() => {
   setIsDragging({ min: false, max: false });
@@ -326,26 +333,31 @@ const fetchChartData = async () => {
     const processedChartYAxis = chartYAxis?.includes(":")
       ? chartYAxis.split(":")[1].trim()
       : chartYAxis;
+  const lowerTextFields = textFieldsList.map(f => f.toLowerCase());
+  const lowerNumericFields = numericFieldsList.map(f => f.toLowerCase());
 
-    let finalXAxes = [...selectedXAxes];
-    if (finalXAxes.length === 0) {
-      if (processedChartXAxis && textFieldsList.includes(processedChartXAxis)) {
-        finalXAxes = [processedChartXAxis];
-      } else if (textFieldsList.length > 0) {
-        finalXAxes = [textFieldsList[0]];
-      }
-      setSelectedXAxes(finalXAxes);
-    }
+let finalXAxes = [...selectedXAxes];
+if (finalXAxes.length === 0) {
+  if (processedChartXAxis && lowerTextFields.includes(processedChartXAxis.toLowerCase())) {
+    const matchedXField = textFieldsList.find(f => f.toLowerCase() === processedChartXAxis.toLowerCase());
+    finalXAxes = [matchedXField];
+  } else if (textFieldsList.length > 0) {
+    finalXAxes = [textFieldsList[0]];
+  }
+  setSelectedXAxes(finalXAxes);
+}
 
-    let finalYAxes = [...selectedYAxes];
-    if (finalYAxes.length === 0) {
-      if (processedChartYAxis && numericFieldsList.includes(processedChartYAxis)) {
-        finalYAxes = [processedChartYAxis];
-      } else if (numericFieldsList.length > 0) {
-        finalYAxes = [numericFieldsList[0]];
-      }
-      setSelectedYAxes(finalYAxes);
-    }
+let finalYAxes = [...selectedYAxes];
+if (finalYAxes.length === 0) {
+  if (processedChartYAxis && lowerNumericFields.includes(processedChartYAxis.toLowerCase())) {
+    const matchedYField = numericFieldsList.find(f => f.toLowerCase() === processedChartYAxis.toLowerCase());
+    finalYAxes = [matchedYField];
+  } else if (numericFieldsList.length > 0) {
+    finalYAxes = [numericFieldsList[0]];
+  }
+  setSelectedYAxes(finalYAxes);
+}
+ 
 
     // If axes are ready, call grouping service
     if (finalXAxes.length > 0 && finalYAxes.length > 0) {
@@ -560,10 +572,16 @@ const processChartData = () => {
 
   return processedData
 }
-
+const chartData = (() => {
+  const fullData = processChartData(); // your original chart data
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  return fullData.slice(startIndex, endIndex);
+})();
 // 3. Make sure this line comes AFTER the processChartData function:
-const chartData = processChartData()
-
+// const chartData = processChartData()
+const fullDataLength = processChartData().length;
+const totalPages = Math.ceil(fullDataLength / itemsPerPage);
 const calculateTotal = (field) => {
   const agg = yAxisAggregations[field] || "SUM";
   const values = chartData.map(item => parseFloat(item[field]) || 0).filter(v => !isNaN(v));
@@ -1308,7 +1326,7 @@ case "stackedDonut":
             layout={legendPosition === "left" || legendPosition === "right" ? "vertical" : "horizontal"}
             align={legendPosition === "left" ? "left" : legendPosition === "right" ? "right" : "center"}
              verticalAlign={legendPosition === "top" ? "top" : "bottom"}
-            wrapperStyle={{ paddingTop: "20px", fontSize: `${legendFontSize}px` }}
+            wrapperStyle={{ paddingTop: "10px", fontSize: `${legendFontSize}px` ,overflowX: "auto",whiteSpace: "nowrap",display: "block", width: "95%",}}
 
           />
         )}
@@ -1359,6 +1377,7 @@ case "stackedDonut":
           layout={legendPosition === "left" || legendPosition === "right" ? "vertical" : "horizontal"}
           align={legendPosition === "left" ? "left" : legendPosition === "right" ? "right" : "center"}
           verticalAlign={legendPosition === "top" ? "top" : "bottom"}
+          
         />
       )}
       
@@ -2454,42 +2473,46 @@ return (
                       ))}
                     </tr>
                   </thead>
-                  
-                  <tbody>
-                    {chartData.map((row, index) => {
-                      const xValues = String(row.combinedKey).split(" | ");
-                      return (
-                        <tr key={index} className={index % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50 dark:bg-slate-800'}>
-                          {/* Split combinedKey into X-axis fields */}
-                          {selectedXAxes.map((xField, i) => (
-                            <td key={xField} className="p-2 border">
-                              {xValues[i] || ""}
-                            </td>
-                          ))}
-                          {/* Raw values for Y fields */}
-                          {selectedYAxes.map(field => (
-                            <td key={field} className="p-2 border text-right">
-                              {(row[field] ?? 0).toLocaleString()}
-                            </td>
-                          ))}
-                        </tr>
-                      );
-                    })}
-          
-                    {/* Totals row */}
-                    <tr className="font-semibold bg-slate-100 dark:bg-slate-700">
-                      {selectedXAxes.map((_, i) => (
-                        <td key={i} className="p-2 border text-right">
-                          {i === selectedXAxes.length - 1 ? "Total:" : ""}
+                 <tbody>
+                  {tasks.map((row, index) => (
+                    <tr key={index} className={index % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50 dark:bg-slate-800'}>
+                      {/* X-axis fields */}
+                      {selectedXAxes.map((xField) => (
+                        <td key={xField} className="p-2 border">
+                          {row[xField] ?? ""}
                         </td>
                       ))}
-                      {selectedYAxes.map(field => (
-                        <td key={field} className="p-2 border text-right">
-                          {calculateTotal(field).toLocaleString()}
+                      
+                      {/* Y-axis fields */}
+                      {selectedYAxes.map((yField) => (
+                        <td key={yField} className="p-2 border text-right">
+                          {(parseFloat(row[yField]) || 0).toLocaleString()}
                         </td>
                       ))}
                     </tr>
-                  </tbody>
+                  ))}
+
+  {/* Totals row */}
+  <tr className="font-semibold bg-slate-100 dark:bg-slate-700">
+    {selectedXAxes.map((_, i) => (
+      <td key={i} className="p-2 border text-right">
+        {i === selectedXAxes.length - 1 ? "Total:" : ""}
+      </td>
+    ))}
+    {selectedYAxes.map((field) => {
+      const total = tasks.reduce((sum, row) => {
+        const value = parseFloat(row[field]);
+        return sum + (isNaN(value) ? 0 : value);
+      }, 0);
+      return (
+        <td key={field} className="p-2 border text-right">
+          {total.toLocaleString()}
+        </td>
+      );
+    })}
+  </tr>
+</tbody>
+
                 </table>
               </div>
             </DialogContent>
@@ -2559,7 +2582,7 @@ return (
 
     <Separator />
 
-    {/* Totals Display */}
+
  {showSummary && selectedYAxes.length > 0 && (
   <div className="flex flex-col gap-2">
        <div className="flex flex-row  gap-2 flex-wrap items-center justify-between">
@@ -2912,7 +2935,10 @@ return (
         </div>
          
        </div>
-        {/* <Separator /> */}
+       
+      </div>
+    )}
+     {/* <Separator /> */}
       <div className="flex flex-row  gap-2 flex-wrap items-center justify-between">
           <div className="flex flex-row gap-1 ">
           
@@ -2931,116 +2957,143 @@ return (
         
    <div className="flex flex-row gap-2 ">
          
-        
-     
-     
-   
-      <div className="w-[150px]">
-            {selectedYAxes.length > 0 && selectedRangeField && (
-          <div className="flex-1 space-y-2">
-           
-            <div className="p-2 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-blue-700 dark:text-blue-300 truncate">
-                    {formatFieldName(selectedRangeField)}
-                  </span>
-                 <div className="flex items-center space-x-1 font-mono bg-white dark:bg-slate-800  rounded border text-xs">
-  <input
-    type="text"
-    value={rangeMin}
-    onChange={(e) => {
-      const raw = e.target.value;
-      const num = Number(raw);
-      if (!isNaN(num)) setRangeMin(num);
-    }}
-    className="w-6 bg-transparent text-blue-600 dark:text-blue-400 text-right outline-none text-xs "
-    style={{fontSize:"10px"}}
-  />
-  <span className="text-gray-400">-</span>
-  <input
-    type="text"
-    value={rangeMax}
-    onChange={(e) => {
-      const raw = e.target.value;
-      const num = Number(raw);
-      if (!isNaN(num)) setRangeMax(num);
-    }}
-    className="w-6 bg-transparent text-blue-600 dark:text-blue-400 text-right outline-none text-xs"
-       style={{fontSize:"10px"}}
-  />
-</div>
-
-</div>
-                
-                {/* Compact Range Slider */}
-<div className="relative w-full h-1 flex items-center" ref={sliderRef}>
-  <div className="absolute w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-lg shadow-inner"></div>
-  <div
-    className="absolute h-1 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg shadow-md"
-    style={{
-      left: `${valueToPercent(rangeMin)}%`,
-      width: `${valueToPercent(rangeMax) - valueToPercent(rangeMin)}%`
-    }}
-  ></div>
-  
-  {/* Min thumb */}
-  <div
-    className={`absolute w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-lg cursor-pointer transform -translate-x-1/2 z-20 transition-transform hover:scale-110 ${
-      isDragging.min ? 'scale-110' : ''
-    }`}
-    style={{ left: `${valueToPercent(rangeMin)}%` }}
-    onMouseDown={handleMouseDown('min')}
-  />
-  
-  {/* Max thumb */}
-  <div
-    className={`absolute w-4 h-4 bg-indigo-500 border-2 border-white rounded-full shadow-lg cursor-pointer transform -translate-x-1/2 z-20 transition-transform hover:scale-110 ${
-      isDragging.max ? 'scale-110' : ''
-    }`}
-    style={{ left: `${valueToPercent(rangeMax)}%` }}
-    onMouseDown={handleMouseDown('max')}
-  />
-  
-  {/* Hidden range inputs for accessibility and keyboard support */}
-  <input
-    type="range"
-    min={dataMin}
-    max={dataMax}
-    step={(dataMax - dataMin) / 100}
-    value={rangeMin}
-    onChange={(e) => {
-      const value = Number(e.target.value);
-      const adjustedValue = Math.max(dataMin, Math.min(value, rangeMax - (dataMax - dataMin) * 0.01));
-      setRangeMin(Math.floor(adjustedValue));
-    }}
-    className="absolute w-full h-1 bg-transparent appearance-none cursor-pointer opacity-0 z-10"
-  />
-  
-  <input
-    type="range"
-    min={dataMin}
-    max={dataMax}
-    step={(dataMax - dataMin) / 100}
-    value={rangeMax}
-    onChange={(e) => {
-      const value = Number(e.target.value);
-      const adjustedValue = Math.min(dataMax, Math.max(value, rangeMin + (dataMax - dataMin) * 0.01));
-      setRangeMax(Math.floor(adjustedValue));
-    }}
-    className="absolute w-full h-1 bg-transparent appearance-none cursor-pointer opacity-0 z-10"
-  />
-</div>
-              </div>
+  <div className="w-[150px]">
+  {selectedYAxes.length > 0 && selectedRangeField && (
+    <div className="flex-1 ">
+      <div className="px-2  bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+        <div className="space-y-1 text-xs">
+          <div className="flex w-full items-center justify-between">
+            <span className="text-blue-700 dark:text-blue-300 truncate"   style={{ fontSize: "10px" }}>
+              {formatFieldName(selectedRangeField)}
+            </span>
+            <div className="flex items-center gap-1 bg-transparent px-1 ">
+             
+              <button
+                className="ml-1 text-red-500 text-[10px] underline"
+                onClick={() => {
+                  setRangeMin(dataMin);
+                  setRangeMax(dataMax);
+                  setErrorMsg("");
+                }}
+              >
+                Reset
+              </button>
             </div>
           </div>
-        )}
+
+          {errorMsg && (
+            <div className="text-red-500 text-[10px] text-center">{errorMsg}</div>
+          )}
+
+          {/* Compact Range Slider */}
+          <div className="relative w-full h-1 flex items-center mt-1" ref={sliderRef}>
+            <div className="absolute w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-lg shadow-inner"></div>
+            <div
+              className="absolute h-1 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg shadow-md"
+              style={{
+                left: `${valueToPercent(rangeMin)}%`,
+                width: `${valueToPercent(rangeMax) - valueToPercent(rangeMin)}%`
+              }}
+            ></div>
+
+            {/* Min thumb */}
+            <div
+              className={`absolute w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-lg cursor-pointer transform -translate-x-1/2 z-20 transition-transform hover:scale-110 ${
+                isDragging.min ? "scale-110" : ""
+              }`}
+              style={{ left: `${valueToPercent(rangeMin)}%` }}
+              onMouseDown={handleMouseDown("min")}
+            />
+
+            {/* Max thumb */}
+            <div
+              className={`absolute w-4 h-4 bg-indigo-500 border-2 border-white rounded-full shadow-lg cursor-pointer transform -translate-x-1/2 z-20 transition-transform hover:scale-110 ${
+                isDragging.max ? "scale-110" : ""
+              }`}
+              style={{ left: `${valueToPercent(rangeMax)}%` }}
+              onMouseDown={handleMouseDown("max")}
+            />
+
+            {/* Invisible range inputs for keyboard support */}
+            <input
+              type="range"
+              min={dataMin}
+              max={dataMax}
+              step={(dataMax - dataMin) / 100}
+              value={rangeMin}
+              onChange={(e) => {
+                const value = Number(e.target.value);
+                const adjusted = Math.max(dataMin, Math.min(value, rangeMax - 1));
+                setRangeMin(adjusted);
+              }}
+              className="absolute w-full h-1 bg-transparent appearance-none cursor-pointer opacity-0 z-10"
+            />
+            <input
+              type="range"
+              min={dataMin}
+              max={dataMax}
+              step={(dataMax - dataMin) / 100}
+              value={rangeMax}
+              onChange={(e) => {
+                const value = Number(e.target.value);
+                const adjusted = Math.min(dataMax, Math.max(value, rangeMin + 1));
+                setRangeMax(adjusted);
+              }}
+              className="absolute w-full h-1 bg-transparent appearance-none cursor-pointer opacity-0 z-10"
+            />
+          </div>
+
+           <div className="flex items-center justify-between">
+        
+           <div className="flex items-center gap-1 bg-transparent px-1 w-full">
+  <input
+    type="text"
+    placeholder="Start"
+    value={rangeMin.toFixed(2)}
+    onChange={(e) => {
+      const num = parseFloat(e.target.value);
+      if (!isNaN(num) && num < rangeMax && num >= dataMin) {
+        setRangeMin(num);
+        setErrorMsg("");
+      } else {
+        setErrorMsg(`Start must be ≥ ${dataMin} and < End`);
+      }
+    }}
+    className="w-full bg-transparent text-blue-600 dark:text-blue-400 text-left outline-none text-xs"
+    style={{ fontSize: "10px" }}
+  />
+
+  <input
+    type="text"
+    placeholder="End"
+    value={rangeMax.toFixed(2)}
+    onChange={(e) => {
+      const num = parseFloat(e.target.value);
+      if (!isNaN(num) && num > rangeMin && num <= dataMax) {
+        setRangeMax(num);
+        setErrorMsg("");
+      } else {
+        setErrorMsg(`End must be > Start and ≤ ${dataMax}`);
+      }
+    }}
+    className="w-full bg-transparent text-blue-600 dark:text-blue-400 text-right outline-none text-xs"
+    style={{ fontSize: "10px" }}
+  />
+</div>
+ 
+          </div>
+
+      
+
+        </div>
       </div>
+    </div>
+  )}
+</div>
+
             
 </div>
       </div>
-      </div>
-    )}
   </CardHeader>
 
       <CardContent className="relative p-0">
@@ -3072,6 +3125,30 @@ return (
           </div>
         )}
       </CardContent>
+
+
+<div className="flex justify-end items-center gap-1 pb-2 px-4">
+  <Button 
+    disabled={currentPage === 1} 
+    onClick={() => setCurrentPage(currentPage - 1)}
+    className="h-5 px-2 text-xs"
+  >
+    Previous
+  </Button>
+
+  <span className="text-xs">
+    Page {currentPage} of {totalPages}
+  </span>
+
+  <Button 
+    disabled={currentPage === totalPages} 
+    onClick={() => setCurrentPage(currentPage + 1)}
+    className="h-5 px-2 text-xs"
+  >
+    Next
+  </Button>
+</div>
+
 
     </Card>
     {/* <ChatbotUI /> */}

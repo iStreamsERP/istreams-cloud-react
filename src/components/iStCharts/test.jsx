@@ -155,6 +155,37 @@ const getFilteredData = () => {
 
   return result;
 };
+const convertDotNetDate = (value) => {
+  if (typeof value === 'string') {
+    const match = value.match(/\/Date\((\d+)\)\//);
+    if (match) {
+      const timestamp = parseInt(match[1], 10);
+      const date = new Date(timestamp);
+      const options = { day: 'numeric', month: 'long', year: 'numeric' };
+      return date.toLocaleDateString('en-GB', options); // → 13 March 1998
+    }
+  }
+  return value;
+};
+const transformDotNetDates = (data) => {
+  if (Array.isArray(data)) {
+    return data.map(transformDotNetDates);
+  } else if (typeof data === 'object' && data !== null) {
+    const transformed = {};
+    Object.entries(data).forEach(([key, value]) => {
+      if (typeof value === 'string') {
+        transformed[key] = convertDotNetDate(value);
+      } else if (typeof value === 'object') {
+        transformed[key] = transformDotNetDates(value);
+      } else {
+        transformed[key] = value;
+      }
+    });
+    return transformed;
+  }
+  return data;
+};
+
   const fetchDetailData = async () => {
     setLoading(true)
     try {
@@ -240,32 +271,33 @@ const getFilteredData = () => {
               console.log("Filtered detail data:", detailedData)
               
               if (detailedData && Array.isArray(detailedData) && detailedData.length > 0) {
-                setDetailData(detailedData)
+                setDetailData(transformDotNetDates(detailedData))
               } else {
                 // If no filtered data returned, fall back to client-side filtering
                 console.log("No server-side filtered data, applying client-side filter")
                 const clientFilteredData = applyClientSideFilter(rawData, xAxisFields, categoryValues)
-                setDetailData(clientFilteredData)
+                setDetailData(transformDotNetDates(clientFilteredData))
               }
             } catch (apiError) {
               console.error("Server-side filtering failed, falling back to client-side:", apiError)
               // Fall back to client-side filtering
               const clientFilteredData = applyClientSideFilter(rawData, xAxisFields, categoryValues)
-              setDetailData(clientFilteredData)
+              setDetailData(transformDotNetDates(clientFilteredData))
             }
           } else {
             // No valid filter condition, show all data
             console.log("No valid filter condition, showing all data")
-            setDetailData(rawData)
+            setDetailData(transformDotNetDates(rawData))
           }
         } else {
           // No filter applied, show all data
           console.log("No filter criteria provided, showing all data")
-          setDetailData(rawData)
+          setDetailData(transformDotNetDates(rawData))
         }
       } else {
         console.log("No raw data available")
-        setDetailData([])
+       setDetailData(transformDotNetDates(fallbackData || []));
+
       }
     } catch (error) {
       console.error("Failed to fetch chart detail data", error)
@@ -276,7 +308,8 @@ const getFilteredData = () => {
         setDetailData(fallbackData || [])
       } catch (fallbackError) {
         console.error("Fallback data fetch also failed", fallbackError)
-        setDetailData([])
+       setDetailData(transformDotNetDates(fallbackData || []));
+
       }
     } finally {
       setLoading(false)
@@ -1364,7 +1397,8 @@ const handleDownloadExcel = () => {
                 {allFields.map((field, index) => (
                   <TableHead
                     key={field}
-                    className="px-4 py-3 text-left text-sm font-medium text-muted-foreground border-b whitespace-nowrap" // Added: whitespace-nowrap
+                  className={`px-4 py-3 text-left text-sm font-medium text-muted-foreground border-b  ${/amount|value|total|price/i.test(field) ? 'w-[160px]' : ''}`}
+
                   >
                     <div className="flex items-center justify-between gap-2 min-w-0"> {/* Added: min-w-0 */}
                       <div className="flex items-center gap-2">

@@ -572,14 +572,15 @@ const processChartData = () => {
 
   return processedData
 }
-const chartData = (() => {
-  const fullData = processChartData(); // your original chart data
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  return fullData.slice(startIndex, endIndex);
-})();
+// const chartData = (() => {
+//   const fullData = processChartData(); // your original chart data
+//   const startIndex = (currentPage - 1) * itemsPerPage;
+//   const endIndex = startIndex + itemsPerPage;
+//   return fullData.slice(startIndex, endIndex);
+// })();
 // 3. Make sure this line comes AFTER the processChartData function:
-// const chartData = processChartData()
+const chartData = processChartData()
+
 const fullDataLength = processChartData().length;
 const totalPages = Math.ceil(fullDataLength / itemsPerPage);
 const calculateTotal = (field) => {
@@ -1959,7 +1960,22 @@ case "stackedDonut":
     }
   };
  
-
+const getChartScrollStyle = () => {
+  if (chartType === "bar" || chartType === "stackedBar") {
+    return {
+      container: { overflowX: "auto", overflowY: "hidden", width: "100%" },
+      inner: { width: `${chartData.length * 50}px`, minWidth: "100%" }
+    };
+  } else if (chartType === "horizontalBar" || chartType === "horizontalStackedBar") {
+    return {
+      container: { overflowY: "auto", overflowX: "hidden", maxHeight: "450px" },
+      inner: { height: `${chartData.length * 35}px`, minHeight: "100%" }
+    };
+  } else {
+    return { container: {}, inner: {} };
+  }
+};
+const { container, inner } = getChartScrollStyle();
 return (
   <div>
  <Card className="w-full bg-white dark:bg-slate-950 border shadow-sm">
@@ -3098,13 +3114,15 @@ return (
 
       <CardContent className="relative p-0">
         {chartData.length > 0 && selectedXAxes.length > 0 && selectedYAxes.length > 0 ? (
+          <div  style={container}>
           <div
             id={`chart-container-${ChartNo}`}
             className="w-full h-full min-h-[300px]"
-            style={{
-              height: `${chartHeight}px`,
-              maxHeight: 'calc(100vh - 300px)' // Adjust based on your layout
-            }}
+            style={
+              // height: `${chartHeight}px`,
+              // maxHeight: 'calc(100vh - 300px)', // Adjust based on your layout
+              inner
+            }
           >
             <ResponsiveContainer
               width="100%"
@@ -3113,6 +3131,7 @@ return (
             >
               {renderChart()}
             </ResponsiveContainer>
+          </div>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center text-muted-foreground">

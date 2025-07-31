@@ -1261,6 +1261,24 @@ const handleDownloadExcel = () => {
     a.click()
     window.URL.revokeObjectURL(url)
   }
+const selectedCategoryValues = selectedCategory
+  ? selectedCategory.split(',').map(s => s.trim().toUpperCase())
+  : [];
+  const fieldsToHide = new Set();
+
+if (detailData.length > 0 && selectedCategoryValues.length > 0) {
+  const firstRow = detailData[0];
+
+  Object.keys(firstRow).forEach((field) => {
+    const colValues = detailData.map(row => String(row[field] || '').toUpperCase());
+    const matchFound = selectedCategoryValues.some(catVal => colValues.includes(catVal));
+    if (matchFound) {
+      fieldsToHide.add(field);
+    }
+  });
+}
+const compactFields = ["AMOUNT", "COST", "CURRENCY", "PRICE"];
+
 
   if (loading) {
     return (
@@ -1394,10 +1412,15 @@ const handleDownloadExcel = () => {
           <Table className="w-full min-w-max"> {/* Changed: removed table-fixed, added min-w-max */}
             <TableHeader className="bg-muted/50 sticky top-0 z-10">
               <TableRow>
-                {allFields.map((field, index) => (
+              {allFields
+                .filter(field => !fieldsToHide.has(field))
+                .map((field) => {
+                  const isCompact = compactFields.includes(field.toUpperCase());
+                  return (
                   <TableHead
                     key={field}
-                    className="px-4 py-3 text-left text-sm font-medium text-muted-foreground border-b whitespace-nowrap" // Added: whitespace-nowrap
+                    className={`px-4 py-3 text-left text-sm font-medium text-muted-foreground border-b  ${/amount|value|total|price/i.test(field) ? 'w-[160px]' : ''}`}
+
                   >
                     <div className="flex items-center justify-between gap-2 min-w-0"> {/* Added: min-w-0 */}
                       <div className="flex items-center gap-2">
@@ -1406,7 +1429,8 @@ const handleDownloadExcel = () => {
                       <ExcelFilter column={field} />
                     </div>
                   </TableHead>
-                ))}
+                 );
+                })}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1415,7 +1439,11 @@ const handleDownloadExcel = () => {
                   key={rowIndex}
                   className="border-b hover:bg-muted/25 transition-colors"
                 >
-                  {allFields.map((field) => (
+                {allFields
+                .filter(field => !fieldsToHide.has(field))
+                .map((field) => {
+                  const isCompact = compactFields.includes(field.toUpperCase());
+                  return (
                     <TableCell
                       key={`${rowIndex}-${field}`}
                       className={`px-4 py-3 text-sm whitespace-nowrap ${isNumericField(field, sampleData) ? 'text-right' : ''}`} // Added: whitespace-nowrap
@@ -1429,13 +1457,18 @@ const handleDownloadExcel = () => {
                         <span>{String(row[field] || '')}</span>
                       )}
                     </TableCell>
-                  ))}
+                );
+  })}
                 </TableRow>
               ))}
               
               {/* Totals Row */}
               <TableRow className="border-t-2 border-primary/20 bg-muted/30 font-semibold">
-                {allFields.map((field, index) => (
+                {allFields
+                .filter(field => !fieldsToHide.has(field))
+                .map((field, index) => {
+                  const isCompact = compactFields.includes(field.toUpperCase());
+                  return (
                   <TableCell
                     key={`total-${field}`}
                     className={`px-4 py-3 text-sm whitespace-nowrap ${isNumericField(field, sampleData) ? 'text-right' : ''}`} // Added: whitespace-nowrap
@@ -1450,7 +1483,8 @@ const handleDownloadExcel = () => {
                       <span className="text-muted-foreground">-</span>
                     )}
                   </TableCell>
-                ))}
+                   );
+    })}
               </TableRow>
             </TableBody>
           </Table>

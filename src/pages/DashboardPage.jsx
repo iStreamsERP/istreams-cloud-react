@@ -210,7 +210,7 @@ const DashboardPage = () => {
             const generateRandomValue = () => {
               const badgeValue = item[`BADGE${badgeNum}_VALUE`];
               if (!badgeValue) return "N/A";
-              const badgeValueStr = String(badgeValue);
+              const badgeValueStr = String(parseInt(badgeValue));
               const prefix = badgeValueStr.replace(/[0-9]/g, "");
               const numbers = badgeValueStr.replace(/[^0-9]/g, "");
               if (numbers.length === 0) return badgeValueStr;
@@ -218,7 +218,7 @@ const DashboardPage = () => {
                 (Math.random() * (parseInt(numbers) * 2 - parseInt(numbers))) / 2 +
                 parseInt(numbers) / 2
               ).toString();
-              return prefix + randomNum;
+              return prefix + parseInt(randomNum);
             };
             return (
               <Card
@@ -255,7 +255,7 @@ const DashboardPage = () => {
                                 const isDecimal = valStr.includes(".") && !isNaN(Number(valStr));
                                 const currencySymbol = userData?.companyCurrSymbol || "$";
 
-                                return isDecimal ? `${currencySymbol} ${valStr}` : valStr;
+                                return isDecimal ? `${currencySymbol} ${parseInt(val)}` : valStr;
                               })()
                             )}
                           </div>

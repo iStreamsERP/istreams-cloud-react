@@ -255,7 +255,8 @@ const DashboardPage = () => {
                                 const isDecimal = valStr.includes(".") && !isNaN(Number(valStr));
                                 const currencySymbol = userData?.companyCurrSymbol || "$";
 
-                                return isDecimal ? `${currencySymbol} ${parseInt(val)}` : valStr;
+return isDecimal ? `${currencySymbol} ${Number(val).toLocaleString()}` : valStr;
+
                               })()
                             )}
                           </div>

@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
-import { ChevronDown, X, BarChart3, TrendingUp, Settings, Palette, Eye, Download, Activity, AreaChart as AreaChartIcon, BarChart4, PieChart as PieChartIcon,MessageCircle ,Sparkles,Zap,Brain,Cpu, ChevronUp,Table} from "lucide-react"
+import { ChevronDown, X, BarChart3, TrendingUp, Settings, Palette, Eye, Download, Activity, AreaChart as AreaChartIcon, BarChart4, PieChart as PieChartIcon,MessageCircle ,Sparkles,Zap,Brain,Cpu, ChevronUp,Table, Expand, Minimize,ScanLine} from "lucide-react"
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { toPng } from 'html-to-image';
 import jsPDF from 'jspdf';
@@ -76,6 +76,7 @@ export function GrossSalaryChart({ DashBoardID, ChartNo, chartTitle ,chartType: 
 
   const [isTableDialogOpen, setIsTableDialogOpen] = useState(false);
   const [isChartPreview, setIsChartPreview] = useState(false);
+  const [showFullChart, setShowFullChart] = useState(false);
 
   const [showSummary, setShowSummary] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -572,31 +573,61 @@ const processChartData = () => {
 
   return processedData
 }
-// const chartData = (() => {
-//   const fullData = processChartData(); // your original chart data
-//   const startIndex = (currentPage - 1) * itemsPerPage;
-//   const endIndex = startIndex + itemsPerPage;
-//   return fullData.slice(startIndex, endIndex);
-// })();
+const chartData = (() => {
+  const fullData = processChartData();
+  if (showFullChart) return fullData; // Show all data
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  return fullData.slice(startIndex, endIndex);
+})();
+
 // 3. Make sure this line comes AFTER the processChartData function:
-const chartData = processChartData()
+// const chartData = processChartData()
 
 const fullDataLength = processChartData().length;
 const totalPages = Math.ceil(fullDataLength / itemsPerPage);
 const calculateTotal = (field) => {
   const agg = yAxisAggregations[field] || "SUM";
-  const values = chartData.map(item => parseFloat(item[field]) || 0).filter(v => !isNaN(v));
+  const values = processChartData()
+    .map(item => parseFloat(item[field]) || 0)
+    .filter(v => !isNaN(v));
 
+  let total;
   switch (agg) {
     case "AVG":
-      return values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+      total = values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+      break;
     case "COUNT":
-      return values.length;
+      total = values.length;
+      break;
     case "SUM":
     default:
-      return values.reduce((a, b) => a + b, 0);
+      total = values.reduce((a, b) => a + b, 0);
   }
+
+  // ✅ Return value with commas and 2 decimal places
+  return total.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 };
+
+// const calculateTotal = (field) => {
+//   const agg = yAxisAggregations[field] || "SUM";
+//   const values = processChartData().map(item => parseFloat(item[field]) || 0).filter(v => !isNaN(v));
+
+//   switch (agg) {
+//     case "AVG":
+//       return values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+//     case "COUNT":
+//       return values.length;
+//     case "SUM":
+//     default:
+//       return values.reduce((a, b) => a + b, 0);
+       
+//   }
+//    return total.toFixed(2);
+// };
 
 
 // const formatValue = (value, fieldName = '') => {
@@ -2971,8 +3002,8 @@ return (
           
         </div>
         
-   <div className="flex flex-row gap-2 ">
-         
+   <div className="flex flex-row gap-1 items-center justify-between ">
+     
   <div className="w-[150px]">
   {selectedYAxes.length > 0 && selectedRangeField && (
     <div className="flex-1 ">
@@ -3106,8 +3137,12 @@ return (
     </div>
   )}
 </div>
-
-            
+{fullDataLength > itemsPerPage && (
+  <Button onClick={() => setShowFullChart(prev => !prev)} variant="outline"
+      size="sm">
+        {showFullChart ? "Compact View" : "View All Data"}
+      </Button>
+)}    
 </div>
       </div>
   </CardHeader>
@@ -3118,10 +3153,11 @@ return (
           <div
             id={`chart-container-${ChartNo}`}
             className="w-full h-full min-h-[300px]"
-            style={
-              // height: `${chartHeight}px`,
-              // maxHeight: 'calc(100vh - 300px)', // Adjust based on your layout
+            style={{
+              height: `${chartHeight}px`,
+              maxHeight: 'calc(100vh - 300px)', // Adjust based on your layout
               inner
+            }
             }
           >
             <ResponsiveContainer
@@ -3143,10 +3179,12 @@ return (
             </div>
           </div>
         )}
+  
       </CardContent>
+      
+{fullDataLength > itemsPerPage && (
 
-
-<div className="flex justify-end items-center gap-1 pb-2 px-4">
+<div className="flex justify-center items-center gap-1 pb-2 px-4">
   <Button 
     disabled={currentPage === 1} 
     onClick={() => setCurrentPage(currentPage - 1)}
@@ -3167,7 +3205,7 @@ return (
     Next
   </Button>
 </div>
-
+)}
 
     </Card>
     {/* <ChatbotUI /> */}

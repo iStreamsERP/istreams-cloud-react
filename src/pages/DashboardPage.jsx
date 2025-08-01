@@ -43,6 +43,10 @@ const DashboardPage = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    const savedLayout = localStorage.getItem("selected_layout");
+  if (savedLayout) {
+    setSelectedLayout(Number(savedLayout));
+  }
     fetchUserData();
     const timer = setTimeout(() => setShowAnimatedNumbers(false), 1000);
     return () => clearTimeout(timer);
@@ -59,10 +63,16 @@ const DashboardPage = () => {
       setDbData(master);
       setEventData(event);
 
- if (master.length > 0) {
-      const layout = Number(master[0].DEFAULT_LAYOUT);
-      setSelectedLayout(layout && layout > 0 ? layout : 1);
-    }
+if (master.length > 0) {
+  const layoutFromAPI = Number(master[0].DEFAULT_LAYOUT);
+  const savedLayout = localStorage.getItem("selected_layout");
+
+  if (!savedLayout && layoutFromAPI && layoutFromAPI > 0) {
+    setSelectedLayout(layoutFromAPI);
+    localStorage.setItem("selected_layout", layoutFromAPI); // optional
+  }
+}
+
       localStorage.setItem("chatbot_context", JSON.stringify({
       source: "events",
       title: item.UPCOMING_EVENT_HEADER || "Upcoming Events",
@@ -185,7 +195,11 @@ const DashboardPage = () => {
                   <select
                     id="layout-select"
                     value={selectedLayout}
-                    onChange={(e) => setSelectedLayout(Number(e.target.value))}
+                     onChange={(e) => {
+                        const layout = Number(e.target.value);
+                        setSelectedLayout(layout);
+                        localStorage.setItem("selected_layout", layout); // <-- Save layout
+                      }}
                     className="px-2 py-1  rounded-md  dark:bg-slate-900 text-gray-800 dark:text-white"
                   >
                     {[1, 2, 3, 4].map((num) => (
@@ -268,13 +282,11 @@ return isDecimal ? `${currencySymbol} ${Number(val).toLocaleString()}` : valStr;
             );
           })}
         </div>
-)}
-
-
+        )}
           {/* Layout 1 */}
           {selectedLayout === 1 && (
             <>
-              <GrossSalaryChart {...chartProps(item, 1)} />
+              <GrossSalaryChart  {...chartProps(item, 1)} />
               <div className="grid lg:grid-cols-2 gap-3">
                 <GrossSalaryChart {...chartProps(item, 2)} />
                 {renderEventCard(item)}

@@ -83,19 +83,23 @@ export function GrossSalaryChart({ DashBoardID, ChartNo, chartTitle ,chartType: 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 25;
 
+const [tempRangeMin, setTempRangeMin] = useState(rangeMin.toFixed(0));
+const [tempRangeMax, setTempRangeMax] = useState(rangeMax.toFixed(0));
 
+useEffect(() => {
+  setTempRangeMin(rangeMin.toFixed(0));
+  setTempRangeMax(rangeMax.toFixed(0));
+}, [rangeMin, rangeMax]);
 
   const navigate = useNavigate()
   const currencySymbol = userData?.companyCurrSymbol || "$"
-const handlePreviewClick = () => {
+  const handlePreviewClick = () => {
   const chartData = {
     DashBoardID,
     ChartNo,
     chartTitle: customTitle || chartTitle,
     chartXAxis,
     chartYAxis,
-    
-
   };
 
   // Store in sessionStorage
@@ -3097,18 +3101,22 @@ return (
 
            <div className="flex items-center justify-between">
         
-           <div className="flex items-center gap-1 bg-transparent px-1 w-full">
+      <div className="flex items-center gap-1 bg-transparent px-1 w-full">
   <input
-    type="text"
+    type="number"
     placeholder="Start"
-    value={rangeMin.toFixed(0)}
+    value={tempRangeMin}
     onChange={(e) => {
-      const num = parseFloat(e.target.value);
+      setTempRangeMin(e.target.value); // allow free typing
+    }}
+    onBlur={() => {
+      const num = parseFloat(tempRangeMin);
       if (!isNaN(num) && num < rangeMax && num >= dataMin) {
         setRangeMin(num);
         setErrorMsg("");
       } else {
-        setErrorMsg(`Start must be ≥ ${dataMin} and < End`);
+        setErrorMsg(`Start must be ≥ ${dataMin}`);
+        setTempRangeMin(rangeMin.toFixed(0)); // reset to valid
       }
     }}
     className="w-full bg-transparent text-blue-600 dark:text-blue-400 text-left outline-none text-xs"
@@ -3116,22 +3124,27 @@ return (
   />
 
   <input
-    type="text"
+    type="number"
     placeholder="End"
-    value={rangeMax.toFixed(0)}
+    value={tempRangeMax}
     onChange={(e) => {
-      const num = parseFloat(e.target.value);
+      setTempRangeMax(e.target.value); // allow free typing
+    }}
+    onBlur={() => {
+      const num = parseFloat(tempRangeMax);
       if (!isNaN(num) && num > rangeMin && num <= dataMax) {
         setRangeMax(num);
         setErrorMsg("");
       } else {
-        setErrorMsg(`End must be > Start and ≤ ${dataMax}`);
+        setErrorMsg(`End must be ≤ ${dataMax}`);
+        setTempRangeMax(rangeMax.toFixed(0)); // reset to valid
       }
     }}
     className="w-full bg-transparent text-blue-600 dark:text-blue-400 text-right outline-none text-xs"
     style={{ fontSize: "10px" }}
   />
 </div>
+
  
           </div>
 

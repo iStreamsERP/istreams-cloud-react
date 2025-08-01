@@ -109,7 +109,7 @@ const ChatbotUI = () => {
     formData.append('Question', inputMessage);
 
     try {
-      const response = await axios.post('https://apps.istreams-erp.com:4492/api/Gemini/ask-from-file', formData, {
+      const response = await axios.post('https://apps.istreams-erp.com:4493/api/SmartAsk/ask-from-file', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 

@@ -3003,7 +3003,12 @@ return (
         </div>
         
    <div className="flex flex-row gap-1 items-center justify-between ">
-     
+     {fullDataLength > itemsPerPage && (
+  <Button onClick={() => setShowFullChart(prev => !prev)} variant="outline"
+      size="sm">
+        {showFullChart ? "Compact View" : "View All Data"}
+      </Button>
+)}  
   <div className="w-[150px]">
   {selectedYAxes.length > 0 && selectedRangeField && (
     <div className="flex-1 ">
@@ -3096,7 +3101,7 @@ return (
   <input
     type="text"
     placeholder="Start"
-    value={rangeMin.toFixed(2)}
+    value={rangeMin.toFixed(0)}
     onChange={(e) => {
       const num = parseFloat(e.target.value);
       if (!isNaN(num) && num < rangeMax && num >= dataMin) {
@@ -3113,7 +3118,7 @@ return (
   <input
     type="text"
     placeholder="End"
-    value={rangeMax.toFixed(2)}
+    value={rangeMax.toFixed(0)}
     onChange={(e) => {
       const num = parseFloat(e.target.value);
       if (!isNaN(num) && num > rangeMin && num <= dataMax) {
@@ -3137,12 +3142,7 @@ return (
     </div>
   )}
 </div>
-{fullDataLength > itemsPerPage && (
-  <Button onClick={() => setShowFullChart(prev => !prev)} variant="outline"
-      size="sm">
-        {showFullChart ? "Compact View" : "View All Data"}
-      </Button>
-)}    
+  
 </div>
       </div>
   </CardHeader>

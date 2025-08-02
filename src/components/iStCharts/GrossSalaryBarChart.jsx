@@ -3214,7 +3214,14 @@ return (
                 Refresh
               </Button>
               )}
-
+ <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchChartData}
+                className="ml-auto"
+              >
+                Refresh
+              </Button>
               <p className="text-base sm:text-lg mb-2">Configure Your Chart</p>
               <p className="text-xs sm:text-sm">Select fields from the dropdowns above to display your chart</p>
 

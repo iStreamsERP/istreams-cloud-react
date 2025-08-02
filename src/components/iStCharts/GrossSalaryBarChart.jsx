@@ -125,11 +125,16 @@ useEffect(() => {
     return !isNaN(numValue) && isFinite(numValue)
   }
 
-  useEffect(() => {
-    if (DashBoardID && ChartNo) {
-      fetchChartData()
-    }
-  }, [DashBoardID, ChartNo])
+useEffect(() => {
+  if (DashBoardID && ChartNo) {
+    // Reset axis state when chart props change
+    setSelectedXAxes([]);
+    setSelectedYAxes([]);
+    fetchChartData();
+  }
+}, [DashBoardID, ChartNo, chartXAxis, chartYAxis,chartTitle]);
+
+
   useEffect(() => {
     if (dbData.length > 0 && DashBoardID) {
       // Find the configuration for current chart
@@ -152,6 +157,7 @@ useEffect(() => {
       }
     }
   }, [dbData, DashBoardID, textFields, numericFields, selectedXAxes.length, selectedYAxes.length])
+  
   useEffect(() => {
   if (initialChartType) {
     setChartType(initialChartType)
@@ -300,7 +306,7 @@ useEffect(() => {
   }
 }, [selectedXAxes, selectedYAxes])
 
-const fetchChartData = async () => {
+const fetchChartData = useCallback(async () => {
   try {
     const chartID = { DashBoardID, ChartNo };
     const res = await callSoapService(userData.clientURL, "BI_GetDashboard_Chart_Data", chartID);
@@ -411,7 +417,7 @@ if (finalYAxes.length === 0) {
     console.error("Failed to fetch chart data", error);
     setTasks([]);
   }
-};
+},[DashBoardID, ChartNo, chartXAxis, chartYAxis, userData, selectedXAxes, selectedYAxes, yAxisAggregations]);;
 
 
 
@@ -584,6 +590,8 @@ const chartData = (() => {
   const endIndex = startIndex + itemsPerPage;
   return fullData.slice(startIndex, endIndex);
 })();
+
+
 
 // 3. Make sure this line comes AFTER the processChartData function:
 // const chartData = processChartData()
@@ -2011,6 +2019,20 @@ const getChartScrollStyle = () => {
   }
 };
 const { container, inner } = getChartScrollStyle();
+const didAutoTrigger = useRef(false);
+
+useEffect(() => {
+  const isChartEmpty =
+    processChartData().length === 0 &&
+    selectedXAxes.length === 0 &&
+    selectedYAxes.length === 0;
+
+  if (isChartEmpty && !didAutoTrigger.current) {
+    fetchChartData();
+    didAutoTrigger.current = true;
+  }
+}, [selectedXAxes, selectedYAxes, dbData]);
+
 return (
   <div>
  <Card className="w-full bg-white dark:bg-slate-950 border shadow-sm">
@@ -3007,12 +3029,7 @@ return (
         </div>
         
    <div className="flex flex-row gap-1 items-center justify-between ">
-     {fullDataLength > itemsPerPage && (
-  <Button onClick={() => setShowFullChart(prev => !prev)} variant="outline"
-      size="sm">
-        {showFullChart ? "Compact View" : "View All Data"}
-      </Button>
-)}  
+    
   <div className="w-[150px]">
   {selectedYAxes.length > 0 && selectedRangeField && (
     <div className="flex-1 ">
@@ -3184,11 +3201,23 @@ return (
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center text-muted-foreground">
-            {getChartTypeIcon(chartType)}
+            {/* {getChartTypeIcon(chartType)} */}
             <div className="mt-4 text-center px-4">
               <BarChart3 className="h-8 w-8 sm:h-12 sm:w-12 mb-4 mx-auto" />
+              {chartData.length === 0 && selectedXAxes.length === 0 && selectedYAxes.length === 0 && (
+               <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchChartData}
+                className="ml-auto"
+              >
+                Refresh
+              </Button>
+              )}
+
               <p className="text-base sm:text-lg mb-2">Configure Your Chart</p>
               <p className="text-xs sm:text-sm">Select fields from the dropdowns above to display your chart</p>
+
             </div>
           </div>
         )}
@@ -3198,26 +3227,41 @@ return (
 {fullDataLength > itemsPerPage && (
 
 <div className="flex justify-center items-center gap-1 pb-2 px-4">
-  <Button 
-    disabled={currentPage === 1} 
-    onClick={() => setCurrentPage(currentPage - 1)}
-    className="h-5 px-2 text-xs"
-  >
-    Previous
-  </Button>
+  {!showFullChart && (
+    <>
+      <Button 
+        disabled={currentPage === 1} 
+        onClick={() => setCurrentPage(currentPage - 1)}
+        className="h-5 px-2 text-xs"
+      >
+        Previous
+      </Button>
 
-  <span className="text-xs">
-    Page {currentPage} of {totalPages}
-  </span>
+      <span className="text-xs">
+        {currentPage} of {totalPages}
+      </span>
 
-  <Button 
-    disabled={currentPage === totalPages} 
-    onClick={() => setCurrentPage(currentPage + 1)}
-    className="h-5 px-2 text-xs"
-  >
-    Next
-  </Button>
+      <Button 
+        disabled={currentPage === totalPages} 
+        onClick={() => setCurrentPage(currentPage + 1)}
+        className="h-5 px-2 text-xs"
+      >
+        Next
+      </Button>
+    </>
+  )}
+
+  {fullDataLength > itemsPerPage && (
+    <Button 
+      onClick={() => setShowFullChart(prev => !prev)} 
+      variant="outline"
+      className="h-5 px-2 text-xs"
+    >
+      {showFullChart ? "Compact View" : "View All"}
+    </Button>
+  )}
 </div>
+
 )}
 
     </Card>

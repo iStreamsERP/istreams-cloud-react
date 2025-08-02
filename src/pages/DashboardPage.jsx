@@ -199,6 +199,7 @@ if (master.length > 0) {
                         const layout = Number(e.target.value);
                         setSelectedLayout(layout);
                         localStorage.setItem("selected_layout", layout); // <-- Save layout
+                      
                       }}
                     className="px-2 py-1  rounded-md  dark:bg-slate-900 text-gray-800 dark:text-white"
                   >
@@ -286,12 +287,14 @@ return isDecimal ? `${currencySymbol} ${Number(val).toLocaleString()}` : valStr;
           {/* Layout 1 */}
           {selectedLayout === 1 && (
             <>
-              <GrossSalaryChart  {...chartProps(item, 1)} />
+              <GrossSalaryChart  key={`chart-${selectedLayout}-${dashboardId}-${item.DASHBOARD_ID}-1`} DashBoardID={dashboardId} ChartNo={1}  chartTitle={item[`CHART1_TITLE`]} chartXAxis={item[`CHART1_X_AXIS1`]} chartYAxis={item[`CHART1_Y_AXIS1`]}  chartType={"bar"} />
+
               <div className="grid lg:grid-cols-2 gap-3">
-                <GrossSalaryChart {...chartProps(item, 2)} />
+               <GrossSalaryChart  key={`chart-${selectedLayout}-${dashboardId}-${item.DASHBOARD_ID}-2`} DashBoardID={dashboardId}  ChartNo={2}  chartTitle={item[`CHART2_TITLE`]} chartXAxis={item[`CHART2_X_AXIS1`]} chartYAxis={item[`CHART2_Y_AXIS1`]} chartType={"donut"}  />
                 {renderEventCard(item)}
               </div>
-              <GrossSalaryChart {...chartProps(item, 3)} />
+             <GrossSalaryChart  key={`chart-${selectedLayout}-${dashboardId}-${item.DASHBOARD_ID}-3`} DashBoardID={dashboardId}  ChartNo={3} chartTitle={item[`CHART3_TITLE`]} chartXAxis={item[`CHART3_X_AXIS1`]} chartYAxis={item[`CHART3_Y_AXIS1`]} chartType={"bar"} />
+
             </>
           )}
 
@@ -299,11 +302,11 @@ return isDecimal ? `${currencySymbol} ${Number(val).toLocaleString()}` : valStr;
           {selectedLayout === 2 && (
             <>
               <div className="grid lg:grid-cols-2 gap-3">
-                <GrossSalaryChart {...chartProps(item, 1)} />
-                <GrossSalaryChart {...chartProps(item, 2)} />
+                 <GrossSalaryChart  key={`chart-${selectedLayout}-${dashboardId}-${item.DASHBOARD_ID}-1`} DashBoardID={dashboardId} ChartNo={1}  chartTitle={item[`CHART1_TITLE`]} chartXAxis={item[`CHART1_X_AXIS1`]} chartYAxis={item[`CHART1_Y_AXIS1`]}  chartType={"bar"} />
+                <GrossSalaryChart  key={`chart-${selectedLayout}-${dashboardId}-${item.DASHBOARD_ID}-2`}  DashBoardID={dashboardId}  ChartNo={2}  chartTitle={item[`CHART2_TITLE`]} chartXAxis={item[`CHART2_X_AXIS1`]} chartYAxis={item[`CHART2_Y_AXIS1`]} chartType={"donut"}  />
               </div>
               <div className="grid lg:grid-cols-2 gap-3">
-                <GrossSalaryChart {...chartProps(item, 3)} />
+               <GrossSalaryChart  key={`chart-${selectedLayout}-${dashboardId}-${item.DASHBOARD_ID}-3`} DashBoardID={dashboardId}  ChartNo={3} chartTitle={item[`CHART3_TITLE`]} chartXAxis={item[`CHART3_X_AXIS1`]} chartYAxis={item[`CHART3_Y_AXIS1`]} chartType={"bar"} />
                 {renderEventCard(item)}
               </div>
             </>
@@ -313,12 +316,12 @@ return isDecimal ? `${currencySymbol} ${Number(val).toLocaleString()}` : valStr;
           {selectedLayout === 3 && (
             <>
               <div className="grid lg:grid-cols-2 gap-3">
-                <GrossSalaryChart {...chartProps(item, 1)} />
+                 <GrossSalaryChart DashBoardID={dashboardId} ChartNo={1}  chartTitle={item[`CHART1_TITLE`]} chartXAxis={item[`CHART1_X_AXIS1`]} chartYAxis={item[`CHART1_Y_AXIS1`]}  chartType={"bar"} />
                 {renderEventCard(item)}
               </div>
               <div className="grid lg:grid-cols-2 gap-3">
-                <GrossSalaryChart {...chartProps(item, 2)} />
-                <GrossSalaryChart {...chartProps(item, 3)} />
+              <GrossSalaryChart  DashBoardID={dashboardId}  ChartNo={2}  chartTitle={item[`CHART2_TITLE`]} chartXAxis={item[`CHART2_X_AXIS1`]} chartYAxis={item[`CHART2_Y_AXIS1`]} chartType={"donut"}  />
+             <GrossSalaryChart DashBoardID={dashboardId}  ChartNo={3} chartTitle={item[`CHART3_TITLE`]} chartXAxis={item[`CHART3_X_AXIS1`]} chartYAxis={item[`CHART3_Y_AXIS1`]} chartType={"bar"} />
               </div>
             </>
           )}
@@ -326,143 +329,10 @@ return isDecimal ? `${currencySymbol} ${Number(val).toLocaleString()}` : valStr;
           {/* Layout 4 */}
           {selectedLayout === 4 && (
             <>
-              <GrossSalaryChart {...chartProps(item, 1)} />
-              <GrossSalaryChart {...chartProps(item, 2)} />
-              <GrossSalaryChart {...chartProps(item, 3)} />
+               <GrossSalaryChart DashBoardID={dashboardId} ChartNo={1}  chartTitle={item[`CHART1_TITLE`]} chartXAxis={item[`CHART1_X_AXIS1`]} chartYAxis={item[`CHART1_Y_AXIS1`]}  chartType={"bar"} />
+                     <GrossSalaryChart  DashBoardID={dashboardId}  ChartNo={2}  chartTitle={item[`CHART2_TITLE`]} chartXAxis={item[`CHART2_X_AXIS1`]} chartYAxis={item[`CHART2_Y_AXIS1`]} chartType={"donut"}  />
+           <GrossSalaryChart DashBoardID={dashboardId}  ChartNo={3} chartTitle={item[`CHART3_TITLE`]} chartXAxis={item[`CHART3_X_AXIS1`]} chartYAxis={item[`CHART3_Y_AXIS1`]} chartType={"bar"} />
               {renderEventCard(item)}
-            </>
-          )}
-
-          {/* Layout 5 */}
-          {selectedLayout === 5 && (
-            <>
-              <div className="grid lg:grid-cols-2 gap-4">
-                <GrossSalaryChart {...chartProps(item, 1)} />
-                <div className="space-y-4">
-                  {[1, 2, 3, 4].map((badgeNum) => {
-                    const colors = ["bg-blue-200", "bg-green-200", "bg-purple-200", "bg-orange-200"];
-                    const textColor = "text-gray-800";
-                    const generateRandomValue = () => {
-                      const badgeValue = item[`BADGE${badgeNum}_VALUE`];
-                      if (!badgeValue) return "N/A";
-                      const badgeValueStr = String(badgeValue);
-                      const prefix = badgeValueStr.replace(/[0-9]/g, "");
-                      const numbers = badgeValueStr.replace(/[^0-9]/g, "");
-                      if (numbers.length === 0) return badgeValueStr;
-                      const randomNum = Math.floor(
-                        (Math.random() * (parseInt(numbers) * 2 - parseInt(numbers))) / 2 +
-                        parseInt(numbers) / 2
-                      ).toString();
-                      return prefix + randomNum;
-                    };
-                    return (
-                      <Card
-                        key={badgeNum}
-                        className={`hover:shadow-lg hover:scale-105 transform transition duration-300 cursor-pointer ${colors[badgeNum - 1]} ${textColor} p-4`}
-                        onClick={() =>
-                          navigate(`/dashboard-details/${item.DASHBOARD_ID}/${badgeNum}`, {
-                            state: { badgeTitle: item[`BADGE${badgeNum}_TITLE`] },
-                          })
-                        }
-                      >
-                        <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4">
-                          <CardTitle className={`text-xl font-medium ${textColor}`}>
-                            {item[`BADGE${badgeNum}_TITLE`] || "Unknown"}
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="pb-3">
-                          <div className="text-xl font-bold flex items-center justify-between pt-2">
-                            {showAnimatedNumbers ? (
-                              <AnimatedNumber
-                                value={item[`BADGE${badgeNum}_VALUE`]}
-                                generateRandomValue={generateRandomValue}
-                              />
-                            ) : (
-                              item[`BADGE${badgeNum}_VALUE`] || "N/A"
-                            )}
-                            <ArrowRight className={`h-4 w-4 ${textColor} mr-1`} />
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="grid lg:grid-cols-2 gap-3">
-                <GrossSalaryChart {...chartProps(item, 2)} />
-                {renderEventCard(item)}
-              </div>
-              <GrossSalaryChart {...chartProps(item, 3)} />
-            </>
-          )}
-          
-            {/* Layout 6 */}
-          {selectedLayout === 6 && (
-            <>
-              <div className="grid lg:grid-cols-2 gap-4">
-                {/* Left: Badges in column */}
-                <div className="space-y-4">
-                  {[1, 2, 3, 4].map((badgeNum) => {
-                    const colors = ["bg-blue-200", "bg-green-200", "bg-purple-200", "bg-orange-200"];
-                    const textColor = "text-gray-800";
-                    const generateRandomValue = () => {
-                      const badgeValue = item[`BADGE${badgeNum}_VALUE`];
-                      if (!badgeValue) return "N/A";
-                      const badgeValueStr = String(badgeValue);
-                      const prefix = badgeValueStr.replace(/[0-9]/g, "");
-                      const numbers = badgeValueStr.replace(/[^0-9]/g, "");
-                      if (numbers.length === 0) return badgeValueStr;
-                      const randomNum = Math.floor(
-                        (Math.random() * (parseInt(numbers) * 2 - parseInt(numbers))) / 2 +
-                        parseInt(numbers) / 2
-                      ).toString();
-                      return prefix + randomNum;
-                    };
-                    return (
-                      <Card
-                        key={badgeNum}
-                        className={`hover:shadow-lg hover:scale-105 transform transition duration-300 cursor-pointer ${colors[badgeNum - 1]} ${textColor}`}
-                        onClick={() =>
-                          navigate(`/dashboard-details/${item.DASHBOARD_ID}/${badgeNum}`, {
-                            state: { badgeTitle: item[`BADGE${badgeNum}_TITLE`] },
-                          })
-                        }
-                      >
-                        <CardHeader className="flex flex-row items-center justify-between pb-1 pt-4">
-                          <CardTitle className={`text-sm font-medium ${textColor}`}>
-                            {item[`BADGE${badgeNum}_TITLE`] || "Unknown"}
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="pb-3">
-                          <div className="text-xl font-bold flex items-center justify-between pt-2">
-                            {showAnimatedNumbers ? (
-                              <AnimatedNumber
-                                value={item[`BADGE${badgeNum}_VALUE`]}
-                                generateRandomValue={generateRandomValue}
-                              />
-                            ) : (
-                              item[`BADGE${badgeNum}_VALUE`] || "N/A"
-                            )}
-                            <ArrowRight className={`h-4 w-4 ${textColor} mr-1`} />
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-
-                {/* Right: Event card full height */}
-                <div className="h-full">
-                  {renderEventCard(item)}
-                </div>
-              </div>
-
-              {/* Below section can be extended if needed */}
-              <GrossSalaryChart {...chartProps(item, 1)} />
-              <div className="grid lg:grid-cols-2 gap-3">
-                <GrossSalaryChart {...chartProps(item, 2)} />
-                <GrossSalaryChart {...chartProps(item, 3)} />
-              </div>
             </>
           )}
 
